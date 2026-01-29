@@ -2,17 +2,21 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { trpc } from "@/lib/trpc";
-import { Loader2, MessageSquare, Plus, Search, Trash2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 
 export default function Chat() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{
     id: string;
     role: "user" | "assistant";
@@ -36,10 +40,10 @@ export default function Chat() {
     onSuccess: (data) => {
       utils.conversations.list.invalidate();
       setSelectedConversationId(data.id);
-      toast.success("새 대화가 생성되었습니다");
+      toast.success(t("chat_created"));
     },
     onError: () => {
-      toast.error("대화 생성에 실패했습니다");
+      toast.error(t("chat_creation_failed"));
     },
   });
 
@@ -48,10 +52,10 @@ export default function Chat() {
     onSuccess: () => {
       utils.conversations.list.invalidate();
       setSelectedConversationId(null);
-      toast.success("대화가 삭제되었습니다");
+      toast.success(t("chat_deleted"));
     },
     onError: () => {
-      toast.error("대화 삭제에 실패했습니다");
+      toast.error(t("chat_deletion_failed"));
     },
   });
 
@@ -63,7 +67,7 @@ export default function Chat() {
       setOptimisticMessages([]);
     },
     onError: () => {
-      toast.error("메시지 전송에 실패했습니다");
+      toast.error(t("message_send_failed"));
       setOptimisticMessages([]);
     },
   });
@@ -79,13 +83,13 @@ export default function Chat() {
   );
 
   const handleNewConversation = () => {
-    const title = "새 대화";
+    const title = t("new_chat");
     createConversation.mutate({ title });
   };
 
   const handleDeleteConversation = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("이 대화를 삭제하시겠습니까?")) {
+    if (confirm(t("delete_confirmation"))) {
       deleteConversation.mutate({ id });
     }
   };
@@ -125,20 +129,29 @@ export default function Chat() {
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="w-80 border-r border-border bg-card flex flex-col">
+      <div
+        className={`${
+          sidebarOpen ? "w-80" : "w-0"
+        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden`}
+      >
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border flex-shrink-0">
+          {/* Logo */}
+          <div className="mb-4 flex items-center gap-2">
+            <img src="/bumjin-logo.png" alt="BumJin" className="h-8" />
+          </div>
+
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold text-foreground">채팅</h1>
+            <h1 className="text-xl font-semibold text-foreground">{t("chat_history")}</h1>
             <Button onClick={handleNewConversation} size="sm" className="gap-2">
               <Plus className="w-4 h-4" />
-              새 대화
+              {t("new_chat")}
             </Button>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="대화 검색..."
+              placeholder={t("search_chat")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -156,7 +169,7 @@ export default function Chat() {
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <MessageSquare className="w-12 h-12 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? "검색 결과가 없습니다" : "대화가 없습니다"}
+                {searchQuery ? t("no_search_results") : t("no_conversations")}
               </p>
             </div>
           ) : (
@@ -167,13 +180,13 @@ export default function Chat() {
                   onClick={() => setSelectedConversationId(conv.id)}
                   className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors mb-1 ${
                     selectedConversationId === conv.id
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent/50"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-primary/10"
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate text-sm">{conv.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs opacity-70">
                       {new Date(conv.updatedAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -191,22 +204,63 @@ export default function Chat() {
           )}
         </ScrollArea>
 
-        {/* User Info & Logout */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center justify-between">
+        {/* User Info & Language & Logout */}
+        <div className="p-4 border-t border-border flex-shrink-0 space-y-3">
+          {/* User Info & Logout Row */}
+          <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-foreground">{user?.name || "사용자"}</p>
+              <p className="text-sm font-medium truncate text-foreground">{user?.name || "User"}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => logout()}>
-              로그아웃
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logout()}
+              className="flex-shrink-0 px-3"
+            >
+              {t("logout")}
             </Button>
+          </div>
+
+          {/* Language Selector */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{t("language")}</span>
+            <LanguageSwitch />
           </div>
         </div>
       </div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
+        {/* Header with Toggle Button */}
+        <div className="border-b border-border bg-card p-4 flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="flex-shrink-0 hover:bg-primary/10"
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          >
+            {sidebarOpen ? (
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h2m0-14h8a2 2 0 012 2v12a2 2 0 01-2 2h-8m0-14V9a2 2 0 012-2h4a2 2 0 012 2v2m-6 4h4"
+                />
+              </svg>
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
+          </Button>
+        </div>
+
         {selectedConversationId ? (
           <>
             {/* Messages */}
@@ -218,8 +272,8 @@ export default function Chat() {
               ) : allMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <MessageSquare className="w-16 h-16 text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2 text-foreground">대화를 시작하세요</h2>
-                  <p className="text-muted-foreground">아래에 메시지를 입력하여 대화를 시작할 수 있습니다.</p>
+                  <h2 className="text-xl font-semibold mb-2 text-foreground">{t("start_conversation")}</h2>
+                  <p className="text-muted-foreground">{t("start_conversation_desc")}</p>
                 </div>
               ) : (
                 <div className="max-w-4xl mx-auto space-y-6">
@@ -259,7 +313,7 @@ export default function Chat() {
             <div className="border-t border-border bg-card p-4">
               <div className="max-w-4xl mx-auto flex gap-3">
                 <Input
-                  placeholder="메시지를 입력하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
+                  placeholder={t("message_placeholder")}
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -270,7 +324,7 @@ export default function Chat() {
                   onClick={handleSendMessage}
                   disabled={!messageInput.trim() || sendMessage.isPending}
                 >
-                  전송
+                  {t("send")}
                 </Button>
               </div>
             </div>
@@ -280,14 +334,12 @@ export default function Chat() {
             <div className="text-center">
               <MessageSquare className="w-20 h-20 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-2xl font-semibold mb-2 text-foreground">
-                {user?.name ? `${user.name}님, 환영합니다!` : "환영합니다!"}
+                {user?.name}{t("welcome")}
               </h2>
-              <p className="text-muted-foreground mb-6">
-                좌측에서 대화를 선택하거나 새 대화를 시작하세요.
-              </p>
+              <p className="text-muted-foreground mb-6">{t("select_or_create")}</p>
               <Button onClick={handleNewConversation} className="gap-2">
                 <Plus className="w-4 h-4" />
-                새 대화 시작
+                {t("start_new_chat")}
               </Button>
             </div>
           </div>
