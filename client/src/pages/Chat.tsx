@@ -134,8 +134,8 @@ export default function Chat() {
           sidebarOpen ? "w-80" : "w-0"
         } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden relative`}
       >
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-border flex-shrink-0">
+        {/* Sidebar Header - Fixed */}
+        <div className="p-4 border-b border-border flex-shrink-0 sticky top-0 bg-card z-10">
           {/* Logo & Close Button */}
           <div className="flex items-center justify-between mb-4">
             <img src="/bumjin-logo.png" alt="BumJin" className="h-8" />
@@ -168,8 +168,8 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Conversation List */}
-        <ScrollArea className="flex-1">
+        {/* Conversation List - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0">
           {conversationsLoading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -211,10 +211,10 @@ export default function Chat() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
-        {/* Bottom Section - Language & User Info & Logout */}
-        <div className="border-t border-border flex-shrink-0 space-y-3 p-4">
+        {/* Bottom Section - Language & User Info & Logout - Fixed */}
+        <div className="border-t border-border flex-shrink-0 space-y-3 p-4 sticky bottom-0 bg-card z-10">
           {/* Language Selector */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t("language")}</span>
