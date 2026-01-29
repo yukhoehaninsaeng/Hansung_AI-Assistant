@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -127,15 +126,15 @@ export default function Chat() {
   const allMessages = [...messages, ...optimisticMessages];
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Sidebar - Fixed */}
       <div
         className={`${
           sidebarOpen ? "w-80" : "w-0"
-        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden relative`}
+        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden relative flex-shrink-0`}
       >
         {/* Sidebar Header - Fixed */}
-        <div className="p-4 border-b border-border flex-shrink-0 sticky top-0 bg-card z-10">
+        <div className="p-4 border-b border-border flex-shrink-0">
           {/* Logo & Close Button */}
           <div className="flex items-center justify-between mb-4">
             <img src="/bumjin-logo.png" alt="BumJin" className="h-8" />
@@ -214,7 +213,7 @@ export default function Chat() {
         </div>
 
         {/* Bottom Section - Language & User Info & Logout - Fixed */}
-        <div className="border-t border-border flex-shrink-0 space-y-3 p-4 sticky bottom-0 bg-card z-10">
+        <div className="border-t border-border flex-shrink-0 space-y-3 p-4">
           {/* Language Selector */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t("language")}</span>
@@ -243,9 +242,9 @@ export default function Chat() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header with Toggle Button */}
-        <div className="border-b border-border bg-card p-4 flex items-center gap-2">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header with Toggle Button - Fixed */}
+        <div className="border-b border-border bg-card p-4 flex items-center gap-2 flex-shrink-0">
           {!sidebarOpen && (
             <Button
               variant="ghost"
@@ -261,8 +260,8 @@ export default function Chat() {
 
         {selectedConversationId ? (
           <>
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-6">
+            {/* Messages - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6">
               {messagesLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -305,10 +304,10 @@ export default function Chat() {
                   <div ref={messagesEndRef} />
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
-            {/* Input Area */}
-            <div className="border-t border-border bg-card p-4">
+            {/* Input Area - Fixed */}
+            <div className="border-t border-border bg-card p-4 flex-shrink-0">
               <div className="max-w-4xl mx-auto flex gap-3">
                 <Input
                   placeholder={t("message_placeholder")}
