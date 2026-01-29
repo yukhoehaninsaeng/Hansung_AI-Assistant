@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, Copy } from "lucide-react";
+import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
@@ -132,13 +132,22 @@ export default function Chat() {
       <div
         className={`${
           sidebarOpen ? "w-80" : "w-0"
-        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden`}
+        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden relative`}
       >
         {/* Sidebar Header */}
         <div className="p-4 border-b border-border flex-shrink-0">
-          {/* Logo */}
-          <div className="mb-4 flex items-center gap-2">
+          {/* Logo & Close Button */}
+          <div className="flex items-center justify-between mb-4">
             <img src="/bumjin-logo.png" alt="BumJin" className="h-8" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              className="flex-shrink-0 hover:bg-primary/10"
+              title="Close sidebar"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
 
           <div className="flex items-center justify-between mb-4">
@@ -204,8 +213,17 @@ export default function Chat() {
           )}
         </ScrollArea>
 
-        {/* User Info & Language & Logout */}
-        <div className="p-4 border-t border-border flex-shrink-0 space-y-3">
+        {/* Bottom Section - Language & User Info & Logout */}
+        <div className="border-t border-border flex-shrink-0 space-y-3 p-4">
+          {/* Language Selector */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{t("language")}</span>
+            <LanguageSwitch />
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-border" />
+
           {/* User Info & Logout Row */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
@@ -221,12 +239,6 @@ export default function Chat() {
               {t("logout")}
             </Button>
           </div>
-
-          {/* Language Selector */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{t("language")}</span>
-            <LanguageSwitch />
-          </div>
         </div>
       </div>
 
@@ -234,31 +246,17 @@ export default function Chat() {
       <div className="flex-1 flex flex-col">
         {/* Header with Toggle Button */}
         <div className="border-b border-border bg-card p-4 flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex-shrink-0 hover:bg-primary/10"
-            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-          >
-            {sidebarOpen ? (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h2m0-14h8a2 2 0 012 2v12a2 2 0 01-2 2h-8m0-14V9a2 2 0 012-2h4a2 2 0 012 2v2m-6 4h4"
-                />
-              </svg>
-            ) : (
+          {!sidebarOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="flex-shrink-0 hover:bg-primary/10"
+              title="Open sidebar"
+            >
               <Menu className="w-5 h-5" />
-            )}
-          </Button>
+            </Button>
+          )}
         </div>
 
         {selectedConversationId ? (
