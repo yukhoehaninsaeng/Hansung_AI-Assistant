@@ -10,7 +10,10 @@ import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 
 export default function Chat() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth({
+    redirectOnUnauthenticated: true,
+    redirectPath: "/",
+  });
   const { t } = useLanguage();
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");

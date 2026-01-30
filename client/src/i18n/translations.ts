@@ -35,6 +35,12 @@ export const translations = {
     // Welcome
     welcome: "님, 환영합니다!",
     select_or_create: "좌측에서 대화를 선택하거나 새 대화를 시작하세요.",
+
+    // Login
+    login_title: "BumJin에 오신 것을 환영합니다",
+    login_subtitle: "로그인 후 대화를 시작할 수 있습니다.",
+    login_button: "로그인하기",
+    login_loading: "로그인 확인 중...",
   },
   EN: {
     // Sidebar
@@ -70,6 +76,12 @@ export const translations = {
     // Welcome
     welcome: ", welcome!",
     select_or_create: "Select a conversation on the left or start a new one.",
+
+    // Login
+    login_title: "Welcome to BumJin",
+    login_subtitle: "Sign in to start chatting.",
+    login_button: "Sign in",
+    login_loading: "Checking login...",
   },
 };
 
