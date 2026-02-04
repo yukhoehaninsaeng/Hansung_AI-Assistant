@@ -15,6 +15,20 @@
       "when": 1769663329872,
       "tag": "0001_pretty_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769735810943,
+      "tag": "0002_tired_ender_wiggin",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1770078946731,
+      "tag": "0003_thick_spyke",
+      "breakpoints": true
     }
   ]
 }

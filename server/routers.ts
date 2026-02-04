@@ -7,18 +7,103 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createConversation,
   createMessage,
+  createLocalUser,
   deleteConversation,
   getConversationById,
   getConversationsByUserId,
   getMessagesByConversationId,
+  getUserByUsername,
   updateConversationTimestamp,
+  updateLastSignedIn,
+  verifyPassword,
 } from "./db";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    
+    login: publicProcedure
+      .input(z.object({
+        username: z.string().min(1),
+        password: z.string().min(1).max(255),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByUsername(input.username);
+        if (!user) {
+          throw new Error("Invalid username or password");
+        }
+        
+        const isPasswordValid = await verifyPassword(input.password, user.passwordHash);
+        if (!isPasswordValid) {
+          throw new Error("Invalid username or password");
+        }
+        
+        // Update last signed in
+        await updateLastSignedIn(user.id);
+        
+        // Set session cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, JSON.stringify({
+          userId: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          loginMethod: "local",
+        }), cookieOptions);
+        
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        };
+      }),
+    
+    register: publicProcedure
+      .input(z.object({
+        username: z.string().min(1).max(64),
+        password: z.string().min(6),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Check if user already exists
+        const existingUser = await getUserByUsername(input.username);
+        if (existingUser) {
+          throw new Error("Username already exists");
+        }
+        
+        // Create new user
+        const userId = await createLocalUser(input.username, input.password, input.name);
+        
+        // Set session cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, JSON.stringify({
+          userId: userId,
+          username: input.username,
+          name: input.name || input.username,
+          email: null,
+          role: "user",
+          loginMethod: "local",
+        }), cookieOptions);
+        
+        return {
+          success: true,
+          user: {
+            id: userId,
+            username: input.username,
+            name: input.name || input.username,
+            email: null,
+            role: "user",
+          },
+        };
+      }),
+    
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

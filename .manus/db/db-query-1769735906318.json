@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `users` MODIFY COLUMN `openId` varchar(64);\nALTER TABLE `users` MODIFY COLUMN `loginMethod` varchar(64) DEFAULT 'local';\nALTER TABLE `users` ADD CONSTRAINT `users_username_unique` UNIQUE(`username`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2wWbAoPYDXwgv6s.root --database iERrf8Q5NEn7wmH3fNxPe9 --execute ALTER TABLE `users` MODIFY COLUMN `openId` varchar(64);\nALTER TABLE `users` MODIFY COLUMN `loginMethod` varchar(64) DEFAULT 'local';\nALTER TABLE `users` ADD CONSTRAINT `users_username_unique` UNIQUE(`username`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2894
+}

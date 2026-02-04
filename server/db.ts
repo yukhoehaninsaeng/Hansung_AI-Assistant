@@ -1,7 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { conversations, InsertConversation, InsertMessage, InsertUser, messages, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import bcryptjs from "bcryptjs";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -18,6 +19,61 @@ export async function getDb() {
   return _db;
 }
 
+// Local login functions
+export async function createLocalUser(username: string, password: string, name?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const passwordHash = await bcryptjs.hash(password, 10);
+  
+  const result = await db.insert(users).values({
+    username,
+    passwordHash,
+    name: name || username,
+    loginMethod: "local",
+    lastSignedIn: new Date(),
+  });
+
+  return Number(result[0].insertId);
+}
+
+export async function getUserByUsername(username: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function verifyPassword(password: string, passwordHash: string | null): Promise<boolean> {
+  if (!passwordHash) return false;
+  return bcryptjs.compare(password, passwordHash);
+}
+
+export async function updateLastSignedIn(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db
+    .update(users)
+    .set({ lastSignedIn: new Date() })
+    .where(eq(users.id, userId));
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
@@ -30,8 +86,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
+    // Generate username from openId if not provided
+    const username = user.username || `user_${user.openId.substring(0, 8)}`;
+    
     const values: InsertUser = {
       openId: user.openId,
+      username,
     };
     const updateSet: Record<string, unknown> = {};
 

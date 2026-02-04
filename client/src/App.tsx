@@ -6,8 +6,25 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Chat from "./pages/Chat";
+import Login from "./pages/Login";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">로딩 중...</div>;
+  }
+
+  if (!user) {
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route component={() => <Redirect to="/login" />} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
       <Route path="/" component={Chat} />
