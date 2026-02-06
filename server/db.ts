@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { and, desc, eq, or, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { conversations, InsertConversation, InsertMessage, InsertUser, messages, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -45,17 +45,6 @@ export async function getUserByUsername(username: string) {
   }
 
   const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
-}
-
-export async function getUserById(userId: number) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
-  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -227,4 +216,158 @@ export async function updateConversationTimestamp(conversationId: number) {
     .update(conversations)
     .set({ updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+}
+
+
+// Admin functions
+export async function getPendingUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.status, "pending"))
+    .orderBy(users.createdAt);
+  
+  return result;
+}
+
+export async function approveUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db
+    .update(users)
+    .set({ status: "approved" })
+    .where(eq(users.id, userId));
+}
+
+export async function rejectUser(userId: number, reason: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db
+    .update(users)
+    .set({ status: "rejected", rejectionReason: reason })
+    .where(eq(users.id, userId));
+}
+
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(users)
+    .orderBy(desc(users.createdAt));
+  
+  return result;
+}
+
+// User Group functions
+export async function getAllUserGroups() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { userGroups } = await import("../drizzle/schema");
+  const result = await db.select().from(userGroups).orderBy(userGroups.name);
+  
+  return result;
+}
+
+export async function createUserGroup(name: string, description?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { userGroups } = await import("../drizzle/schema");
+  const result = await db.insert(userGroups).values({ name, description });
+  
+  return Number(result[0].insertId);
+}
+
+export async function updateUserGroup(groupId: number, name: string, description?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { userGroups } = await import("../drizzle/schema");
+  await db
+    .update(userGroups)
+    .set({ name, description })
+    .where(eq(userGroups.id, groupId));
+}
+
+export async function assignUserToGroup(userId: number, groupId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db
+    .update(users)
+    .set({ groupId })
+    .where(eq(users.id, userId));
+}
+
+// Internal File functions
+export async function createInternalFile(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { internalFiles } = await import("../drizzle/schema");
+  const result = await db.insert(internalFiles).values(data);
+  
+  return Number(result[0].insertId);
+}
+
+export async function searchInternalFiles(query: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { internalFiles } = await import("../drizzle/schema");
+  // Simple text search in filename and content
+  const result = await db
+    .select()
+    .from(internalFiles)
+    .where(
+      or(
+        like(internalFiles.filename, `%${query}%`),
+        like(internalFiles.content, `%${query}%`)
+      )
+    );
+  
+  return result;
+}
+
+export async function getInternalFileById(fileId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const { internalFiles } = await import("../drizzle/schema");
+  const result = await db
+    .select()
+    .from(internalFiles)
+    .where(eq(internalFiles.id, fileId))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function deleteInternalFile(fileId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { internalFiles } = await import("../drizzle/schema");
+  await db.delete(internalFiles).where(eq(internalFiles.id, fileId));
+}
+
+export async function getAllInternalFiles() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { internalFiles } = await import("../drizzle/schema");
+  const result = await db
+    .select()
+    .from(internalFiles)
+    .orderBy(desc(internalFiles.uploadedAt));
+  
+  return result;
 }

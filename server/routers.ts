@@ -16,7 +16,21 @@ import {
   updateConversationTimestamp,
   updateLastSignedIn,
   verifyPassword,
+  getPendingUsers,
+  approveUser,
+  rejectUser,
+  getAllUsers,
+  getAllUserGroups,
+  createUserGroup,
+  updateUserGroup,
+  assignUserToGroup,
+  createInternalFile,
+  searchInternalFiles,
+  getAllInternalFiles,
+  deleteInternalFile,
 } from "./db";
+import { storagePut } from "./storage";
+import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
   system: systemRouter,
@@ -169,18 +183,41 @@ export const appRouter = router({
           content: input.content,
         });
         
-        // Generate AI response using LLM
-        const response = await invokeLLM({
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: input.content },
-          ],
-        });
+        // Search internal files first
+        let assistantContent = "";
+        const fileResults = await searchInternalFiles(input.content);
         
-        const rawContent = response.choices[0]?.message?.content;
-        const assistantContent = typeof rawContent === "string" 
-          ? rawContent 
-          : "Sorry, I couldn't generate a response.";
+        if (fileResults.length > 0) {
+          // Use internal file content as context
+          const fileContext = fileResults
+            .map(f => `[${f.filename}]\n${f.content}`)
+            .join("\n\n");
+          
+          const response = await invokeLLM({
+            messages: [
+              { role: "system", content: "You are a helpful assistant. Use the provided internal documents to answer questions." },
+              { role: "user", content: `Internal documents:\n${fileContext}\n\nUser question: ${input.content}` },
+            ],
+          });
+          
+          const rawContent = response.choices[0]?.message?.content;
+          assistantContent = typeof rawContent === "string" 
+            ? rawContent 
+            : "Sorry, I couldn't generate a response.";
+        } else {
+          // Fall back to general LLM response
+          const response = await invokeLLM({
+            messages: [
+              { role: "system", content: "You are a helpful assistant." },
+              { role: "user", content: input.content },
+            ],
+          });
+          
+          const rawContent = response.choices[0]?.message?.content;
+          assistantContent = typeof rawContent === "string" 
+            ? rawContent 
+            : "Sorry, I couldn't generate a response.";
+        }
         
         // Save assistant message
         const assistantMessageId = await createMessage({
@@ -206,6 +243,145 @@ export const appRouter = router({
             createdAt: new Date(),
           },
         };
+      }),
+  }),
+
+  // Admin management
+  admin: router({
+    // Get pending users for approval
+    getPendingUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+      }
+      return await getPendingUsers();
+    }),
+
+    // Approve user registration
+    approveUser: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await approveUser(input.userId);
+        return { success: true };
+      }),
+
+    // Reject user registration
+    rejectUser: protectedProcedure
+      .input(z.object({ userId: z.number(), reason: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await rejectUser(input.userId, input.reason);
+        return { success: true };
+      }),
+
+    // Get all users
+    getAllUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+      }
+      return await getAllUsers();
+    }),
+
+    // Get all user groups
+    getUserGroups: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+      }
+      return await getAllUserGroups();
+    }),
+
+    // Create user group
+    createUserGroup: protectedProcedure
+      .input(z.object({ name: z.string().min(1), description: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        const groupId = await createUserGroup(input.name, input.description);
+        return { id: groupId };
+      }),
+
+    // Update user group
+    updateUserGroup: protectedProcedure
+      .input(z.object({ groupId: z.number(), name: z.string().min(1), description: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await updateUserGroup(input.groupId, input.name, input.description);
+        return { success: true };
+      }),
+
+    // Assign user to group
+    assignUserToGroup: protectedProcedure
+      .input(z.object({ userId: z.number(), groupId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await assignUserToGroup(input.userId, input.groupId);
+        return { success: true };
+      }),
+  }),
+
+  // Internal file management
+  files: router({
+    // Get all internal files
+    getAll: protectedProcedure.query(async ({ ctx }) => {
+      return await getAllInternalFiles();
+    }),
+
+    // Search internal files
+    search: protectedProcedure
+      .input(z.object({ query: z.string().min(1) }))
+      .query(async ({ ctx, input }) => {
+        return await searchInternalFiles(input.query);
+      }),
+
+    // Upload internal file
+    upload: protectedProcedure
+      .input(z.object({
+        filename: z.string().min(1),
+        content: z.string().min(1),
+        mimeType: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Only admins can upload files
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can upload files" });
+        }
+
+        // Upload to S3
+        const fileKey = `internal-files/${ctx.user.id}/${Date.now()}-${input.filename}`;
+        const { url } = await storagePut(fileKey, input.content, input.mimeType || "text/plain");
+
+        // Save file metadata to database
+        const fileId = await createInternalFile({
+          filename: input.filename,
+          fileKey,
+          fileUrl: url,
+          mimeType: input.mimeType || "text/plain",
+          fileSize: Buffer.byteLength(input.content),
+          content: input.content,
+          uploadedBy: ctx.user.id,
+        });
+
+        return { id: fileId, url };
+      }),
+
+    // Delete internal file
+    delete: protectedProcedure
+      .input(z.object({ fileId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can delete files" });
+        }
+        await deleteInternalFile(input.fileId);
+        return { success: true };
       }),
   }),
 });

@@ -257,28 +257,11 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
+    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
-
-    if (!sessionCookie) {
-      throw ForbiddenError("Invalid session cookie");
-    }
-
-    // Try to parse as local login session (JSON format)
-    try {
-      const localSession = JSON.parse(sessionCookie);
-      if (localSession.userId && typeof localSession.userId === "number") {
-        const user = await db.getUserById(localSession.userId);
-        if (user) {
-          return user;
-        }
-      }
-    } catch (e) {
-      // Not a JSON session, try JWT
-    }
-
-    // Try JWT verification (Manus OAuth)
     const session = await this.verifySession(sessionCookie);
+
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
     }

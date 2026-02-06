@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Chat} />
+      <Route path="/admin" component={Admin} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

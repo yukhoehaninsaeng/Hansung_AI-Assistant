@@ -4,14 +4,16 @@ import { Input } from "@/components/ui/input";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, X } from "lucide-react";
+import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, X, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 
 export default function Chat() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const [, navigate] = useLocation();
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -229,14 +231,26 @@ export default function Chat() {
               <p className="text-sm font-medium truncate text-foreground">{user?.name || "User"}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => logout()}
-              className="flex-shrink-0 px-3"
-            >
-              {t("logout")}
-            </Button>
+            <div className="flex gap-2 flex-shrink-0">
+              {user?.role === "admin" && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => navigate("/admin")}
+                  title="관리자 패널"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => logout()}
+                className="px-3"
+              >
+                {t("logout")}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
