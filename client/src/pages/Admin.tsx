@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-
-import { Loader2, Trash2, Check, X } from "lucide-react";
+import { useLocation } from "wouter";
+import { Loader2, Trash2, Check, X, ArrowLeft } from "lucide-react";
 
 export default function Admin() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("pending");
 
   // Admin queries and mutations
@@ -89,8 +90,20 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold mb-2">관리자 패널 (Admin Dashboard)</h1>
-        <p className="text-gray-600 mb-8">사용자 승인, 그룹 관리, 파일 관리</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">관리자 패널 (Admin Dashboard)</h1>
+            <p className="text-gray-600">사용자 승인, 그룹 관리, 파일 관리</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            홈으로
+          </Button>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
