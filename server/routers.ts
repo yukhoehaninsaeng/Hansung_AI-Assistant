@@ -28,6 +28,10 @@ import {
   searchInternalFiles,
   getAllInternalFiles,
   deleteInternalFile,
+  updateUser,
+  getUserById,
+  getUsersByGroupId,
+  removeUserFromGroup,
 } from "./db";
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
@@ -324,6 +328,51 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
         }
         await assignUserToGroup(input.userId, input.groupId);
+        return { success: true };
+      }),
+
+    // Update user information
+    updateUser: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        name: z.string().optional(),
+        username: z.string().optional(),
+        email: z.string().optional(),
+        password: z.string().optional(),
+        groupId: z.number().nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await updateUser(input.userId, {
+          name: input.name,
+          username: input.username,
+          email: input.email,
+          password: input.password,
+          groupId: input.groupId,
+        });
+        return { success: true };
+      }),
+
+    // Get users in a group
+    getGroupMembers: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        return await getUsersByGroupId(input.groupId);
+      }),
+
+    // Remove user from group
+    removeUserFromGroup: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
+        }
+        await removeUserFromGroup(input.userId);
         return { success: true };
       }),
   }),

@@ -371,3 +371,64 @@ export async function getAllInternalFiles() {
   
   return result;
 }
+
+// Update user information
+export async function updateUser(userId: number, data: {
+  name?: string;
+  username?: string;
+  email?: string;
+  password?: string;
+  groupId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: any = {};
+  
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.username !== undefined) updateData.username = data.username;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.groupId !== undefined) updateData.groupId = data.groupId;
+  
+  if (data.password !== undefined) {
+    updateData.passwordHash = await bcryptjs.hash(data.password, 10);
+  }
+
+  await db
+    .update(users)
+    .set(updateData)
+    .where(eq(users.id, userId));
+}
+
+// Get user by ID
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Get users in a group
+export async function getUsersByGroupId(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.groupId, groupId));
+  
+  return result;
+}
+
+// Remove user from group
+export async function removeUserFromGroup(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(users)
+    .set({ groupId: null })
+    .where(eq(users.id, userId));
+}

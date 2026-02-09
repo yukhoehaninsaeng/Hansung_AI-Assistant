@@ -9,11 +9,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Loader2, Trash2, Check, X, ArrowLeft } from "lucide-react";
+import { EditUserModal } from "@/components/EditUserModal";
+import { GroupMembersModal } from "@/components/GroupMembersModal";
+import { FileUploadComponent } from "@/components/FileUploadComponent";
 
 export default function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("pending");
+  const [editUserOpen, setEditUserOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [groupMembersOpen, setGroupMembersOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // Admin queries and mutations
   const pendingUsersQuery = trpc.admin.getPendingUsers.useQuery(undefined, {
@@ -207,8 +217,15 @@ export default function Admin() {
                         </tr>
                       </thead>
                       <tbody>
-                        {allUsersQuery.data?.map((u) => (
-                          <tr key={u.id} className="border-b hover:bg-gray-50">
+                        {allUsersQuery.data?.map((u: any) => (
+                          <tr
+                            key={u.id}
+                            className="border-b hover:bg-gray-50 cursor-pointer"
+                            onDoubleClick={() => {
+                              setSelectedUser(u);
+                              setEditUserOpen(true);
+                            }}
+                          >
                             <td className="py-2 px-4">{u.name}</td>
                             <td className="py-2 px-4">{u.username}</td>
                             <td className="py-2 px-4">{u.email || "-"}</td>
@@ -278,15 +295,26 @@ export default function Admin() {
                     <p className="text-gray-500">생성된 그룹이 없습니다.</p>
                   ) : (
                     <div className="space-y-3">
-                      {userGroupsQuery.data?.map((group) => (
+                      {userGroupsQuery.data?.map((group: any) => (
                         <div
                           key={group.id}
-                          className="p-4 border rounded-lg"
+                          className="p-4 border rounded-lg flex justify-between items-center"
                         >
-                          <p className="font-semibold">{group.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {group.description || "설명 없음"}
-                          </p>
+                          <div>
+                            <p className="font-semibold">{group.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {group.description || "설명 없음"}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedGroup(group);
+                              setGroupMembersOpen(true);
+                            }}
+                          >
+                            멤버 관리
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -308,7 +336,7 @@ export default function Admin() {
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <h3 className="font-semibold">파일 업로드</h3>
-                  <FileUploadForm onSuccess={() => internalFilesQuery.refetch()} />
+                  <FileUploadComponent onSuccess={() => internalFilesQuery.refetch()} />
                 </div>
 
                 <div className="border-t pt-4">
@@ -351,6 +379,33 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modals */}
+      {selectedUser && (
+        <EditUserModal
+          open={editUserOpen}
+          onOpenChange={setEditUserOpen}
+          user={selectedUser}
+          groups={userGroupsQuery.data || []}
+          onSuccess={() => {
+            allUsersQuery.refetch();
+            setSelectedUser(null);
+          }}
+        />
+      )}
+
+      {selectedGroup && (
+        <GroupMembersModal
+          open={groupMembersOpen}
+          onOpenChange={setGroupMembersOpen}
+          group={selectedGroup}
+          allUsers={allUsersQuery.data || []}
+          onSuccess={() => {
+            userGroupsQuery.refetch();
+            allUsersQuery.refetch();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -408,66 +463,4 @@ function CreateGroupForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function FileUploadForm({ onSuccess }: { onSuccess: () => void }) {
-  const [filename, setFilename] = useState("");
-  const [content, setContent] = useState("");
-  const [mimeType, setMimeType] = useState("text/plain");
 
-  const uploadFileMutation = trpc.files.upload.useMutation({
-    onSuccess: () => {
-      toast.success("File uploaded");
-      setFilename("");
-      setContent("");
-      setMimeType("text/plain");
-      onSuccess();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  return (
-    <div className="space-y-3">
-      <Input
-        placeholder="파일명 (예: company_policy.txt)"
-        value={filename}
-        onChange={(e) => setFilename(e.target.value)}
-      />
-      <select
-        value={mimeType}
-        onChange={(e) => setMimeType(e.target.value)}
-        className="w-full px-3 py-2 border rounded-md"
-      >
-        <option value="text/plain">텍스트 파일</option>
-        <option value="text/markdown">마크다운</option>
-        <option value="application/json">JSON</option>
-      </select>
-      <Textarea
-        placeholder="파일 내용"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={6}
-      />
-      <Button
-        onClick={() => {
-          if (!filename.trim() || !content.trim()) {
-            toast.error("파일명과 내용을 입력하세요");
-            return;
-          }
-          uploadFileMutation.mutate({ filename, content, mimeType });
-        }}
-        disabled={uploadFileMutation.isPending}
-        className="w-full"
-      >
-        {uploadFileMutation.isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            업로드 중...
-          </>
-        ) : (
-          "파일 업로드"
-        )}
-      </Button>
-    </div>
-  );
-}
