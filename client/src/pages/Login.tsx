@@ -21,8 +21,9 @@ export default function Login() {
       toast.success(isLogin ? "로그인 성공!" : "회원가입 성공!");
       await utils.auth.me.invalidate();
       setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 100);
+        // window.location.href를 사용하여 세션 쿠키가 확실히 반영된 상태로 페이지를 새로고침하며 이동합니다.
+        window.location.href = "/";
+      }, 500);
     },
     onError: (error) => {
       toast.error(error.message || "오류가 발생했습니다");
@@ -34,8 +35,9 @@ export default function Login() {
       toast.success("회원가입 성공!");
       await utils.auth.me.invalidate();
       setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 100);
+        // window.location.href를 사용하여 세션 쿠키가 확실히 반영된 상태로 페이지를 새로고침하며 이동합니다.
+        window.location.href = "/";
+      }, 500);
     },
     onError: (error) => {
       toast.error(error.message || "오류가 발생했습니다");
