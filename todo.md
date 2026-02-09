@@ -87,3 +87,8 @@
 - [x] Admin.tsx에 EditUserModal 및 GroupMembersModal 통합
 - [x] 파일 업로드 UI 개선 (PDF, Word, PPT 지원)
 - [x] 로그인 후 채팅창 이동 문제 해결 (정상 작동 확인)
+
+## 긴급 이슈 (진행 중)
+- [x] 로그인 후 채팅 페이지 이동 문제 해결 (로직 로직 추가)
+- [x] 우분투 MySQL 서버 배포용 마이그레이션 스크립트 생성
+- [x] 서버 배포 가이드 문서 작성 (DEPLOY_UBUNTU_MYSQL.md)
