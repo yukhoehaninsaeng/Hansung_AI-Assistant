@@ -62,14 +62,12 @@ export const appRouter = router({
         
         // Set session cookie
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, JSON.stringify({
-          userId: user.id,
-          username: user.username,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          loginMethod: "local",
-        }), cookieOptions);
+        // Create a JWT session token that sdk.verifySession expects
+        const sessionToken = await sdk.createSessionToken(user.openId || user.username, {
+          name: user.name || user.username,
+          expiresInMs: ONE_YEAR_MS,
+        });
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         
         return {
           success: true,
@@ -101,14 +99,12 @@ export const appRouter = router({
         
         // Set session cookie
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, JSON.stringify({
-          userId: userId,
-          username: input.username,
+        // Create a JWT session token that sdk.verifySession expects
+        const sessionToken = await sdk.createSessionToken(input.username, {
           name: input.name || input.username,
-          email: null,
-          role: "user",
-          loginMethod: "local",
-        }), cookieOptions);
+          expiresInMs: ONE_YEAR_MS,
+        });
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         
         return {
           success: true,
