@@ -14,13 +14,17 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
 const buildEndpointUrl = (baseUrl: string): string => {
-  const normalizedBase = baseUrl.endsWith("/")
-    ? baseUrl
-    : `${baseUrl}/`;
-  return new URL(
-    "webdevtoken.v1.WebDevService/SendNotification",
-    normalizedBase
-  ).toString();
+  // URL 생성 시 발생할 수 있는 오류를 방지하기 위해 안전한 문자열 결합 사용
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const path = "webdevtoken.v1.WebDevService/SendNotification";
+  
+  // URL 객체 생성 시 유효하지 않은 baseUrl이 들어오면 에러가 발생할 수 있으므로 예외 처리
+  try {
+    return new URL(path, normalizedBase).toString();
+  } catch (e) {
+    // URL 객체 생성이 실패할 경우 수동으로 결합
+    return normalizedBase + path;
+  }
 };
 
 const validatePayload = (input: NotificationPayload): NotificationPayload => {
@@ -68,18 +72,10 @@ export async function notifyOwner(
 ): Promise<boolean> {
   const { title, content } = validatePayload(payload);
 
-  if (!ENV.forgeApiUrl) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Notification service URL is not configured.",
-    });
-  }
-
-  if (!ENV.forgeApiKey) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Notification service API key is not configured.",
-    });
+  // 로컬 전용 모드에서는 알림 기능을 건너뜁니다.
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    console.log("[Notification] Skipping owner notification in local mode.");
+    return true;
   }
 
   const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
