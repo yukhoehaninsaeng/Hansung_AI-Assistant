@@ -50,12 +50,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const user = await getUserByUsername(input.username);
         if (!user) {
-          throw new Error("Invalid username or password");
+          throw new Error("사용자를 찾을 수 없습니다.");
+        }
+        
+        // 승인 상태 확인 (status가 approved가 아니면 로그인 불가)
+        if (user.status === "pending") {
+          throw new Error("관리자의 승인을 기다리고 있는 계정입니다.");
+        }
+        if (user.status === "rejected") {
+          throw new Error(`가입이 거절되었습니다. 사유: ${user.rejectionReason || "없음"}`);
         }
         
         const isPasswordValid = await verifyPassword(input.password, user.passwordHash);
         if (!isPasswordValid) {
-          throw new Error("Invalid username or password");
+          throw new Error("비밀번호가 일치하지 않습니다.");
         }
         
         // Update last signed in
