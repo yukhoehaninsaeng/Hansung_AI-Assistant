@@ -18,7 +18,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  window.location.href = "/login"; // getLoginUrl 대신 명확한 내부 경로로 이동
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -40,6 +40,7 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
+      // 절대 주소 대신 상대 경로를 사용하여 3000번/3001번 포트 문제를 해결합니다.
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
