@@ -50,391 +50,121 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const user = await getUserByUsername(input.username);
         if (!user) {
-          throw new Error("사용자를 찾을 수 없습니다.");
+          throw new TRPCError({ code: "NOT_FOUND", message: "사용자를 찾을 수 없습니다." });
         }
         
-        // 승인 상태 확인 (status가 approved가 아니면 로그인 불가)
         if (user.status === "pending") {
-          throw new Error("관리자의 승인을 기다리고 있는 계정입니다.");
+          throw new TRPCError({ code: "FORBIDDEN", message: "관리자의 승인을 기다리고 있는 계정입니다." });
         }
         if (user.status === "rejected") {
-          throw new Error(`가입이 거절되었습니다. 사유: ${user.rejectionReason || "없음"}`);
+          throw new TRPCError({ code: "FORBIDDEN", message: `가입이 거절되었습니다. 사유: ${user.rejectionReason || "없음"}` });
         }
         
         const isPasswordValid = await verifyPassword(input.password, user.passwordHash);
         if (!isPasswordValid) {
-          throw new Error("비밀번호가 일치하지 않습니다.");
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "비밀번호가 일치하지 않습니다." });
         }
         
-        // Update last signed in
         await updateLastSignedIn(user.id);
         
-        // Set session cookie
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        // Create a JWT session token that sdk.verifySession expects
-        const sessionToken = await sdk.createSessionToken(user.openId || user.username, {
-          name: user.name || user.username,
-          expiresInMs: ONE_YEAR_MS,
-        });
-        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        const token = await sdk.createSessionToken(user.id, user.username);
         
-        return {
-          success: true,
-          user: {
-            id: user.id,
-            username: user.username,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-        };
+        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions());
+        
+        return { success: true, user };
       }),
-    
+
     register: publicProcedure
       .input(z.object({
         username: z.string().min(1).max(64),
-        password: z.string().min(6),
+        password: z.string().min(6).max(255),
         name: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        // Check if user already exists
         const existingUser = await getUserByUsername(input.username);
         if (existingUser) {
-          throw new Error("Username already exists");
+          throw new TRPCError({ code: "CONFLICT", message: "이미 존재하는 아이디입니다." });
         }
-        
-        // Create new user
+
         const userId = await createLocalUser(input.username, input.password, input.name);
-        
-        // Set session cookie
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        // Create a JWT session token that sdk.verifySession expects
-        const sessionToken = await sdk.createSessionToken(input.username, {
-          name: input.name || input.username,
-          expiresInMs: ONE_YEAR_MS,
-        });
-        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        
-        return {
-          success: true,
-          user: {
-            id: userId,
-            username: input.username,
-            name: input.name || input.username,
-            email: null,
-            role: "user",
-          },
-        };
+        const user = await getUserById(userId);
+
+        if (!user) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "사용자 생성에 실패했습니다." });
+        }
+
+        // 회원가입 성공 후 자동 로그인을 원할 경우 아래 주석 해제 (단, 승인 절차가 있다면 주석 유지)
+        /*
+        const token = await sdk.createSessionToken(user.id, user.username);
+        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions());
+        */
+
+        return { success: true, user };
       }),
-    
+
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      ctx.res.clearCookie(COOKIE_NAME, getSessionCookieOptions());
+      return { success: true };
     }),
   }),
 
-  // Conversation management
-  conversations: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return await getConversationsByUserId(ctx.user.id);
+  // 채팅 관련 라우터
+  chat: router({
+    getConversations: protectedProcedure.query(async ({ ctx }) => {
+      return getConversationsByUserId(ctx.user.id);
     }),
-    
-    create: protectedProcedure
-      .input(z.object({ title: z.string().min(1).max(255) }))
+
+    createConversation: protectedProcedure
+      .input(z.object({ title: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        const conversationId = await createConversation({
+        const id = await createConversation({
           userId: ctx.user.id,
           title: input.title,
         });
-        return { id: conversationId };
+        return { id };
       }),
-    
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        await deleteConversation(input.id, ctx.user.id);
-        return { success: true };
-      }),
-  }),
-  
-  // Message management
-  messages: router({
-    list: protectedProcedure
+
+    getMessages: protectedProcedure
       .input(z.object({ conversationId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        // Verify conversation belongs to user
-        const conversation = await getConversationById(input.conversationId, ctx.user.id);
-        if (!conversation) {
-          throw new Error("Conversation not found");
-        }
-        return await getMessagesByConversationId(input.conversationId);
+      .query(async ({ input }) => {
+        return getMessagesByConversationId(input.conversationId);
       }),
-    
-    send: protectedProcedure
+
+    sendMessage: protectedProcedure
       .input(z.object({
         conversationId: z.number(),
         content: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
-        // Verify conversation belongs to user
-        const conversation = await getConversationById(input.conversationId, ctx.user.id);
-        if (!conversation) {
-          throw new Error("Conversation not found");
-        }
-        
-        // Save user message
-        const userMessageId = await createMessage({
+        // 1. 사용자 메시지 저장
+        await createMessage({
           conversationId: input.conversationId,
           role: "user",
           content: input.content,
         });
-        
-        // Search internal files first
-        let assistantContent = "";
-        const fileResults = await searchInternalFiles(input.content);
-        
-        if (fileResults.length > 0) {
-          // Use internal file content as context
-          const fileContext = fileResults
-            .map(f => `[${f.filename}]\n${f.content}`)
-            .join("\n\n");
-          
-          const response = await invokeLLM({
-            messages: [
-              { role: "system", content: "You are a helpful assistant. Use the provided internal documents to answer questions." },
-              { role: "user", content: `Internal documents:\n${fileContext}\n\nUser question: ${input.content}` },
-            ],
-          });
-          
-          const rawContent = response.choices[0]?.message?.content;
-          assistantContent = typeof rawContent === "string" 
-            ? rawContent 
-            : "Sorry, I couldn't generate a response.";
-        } else {
-          // Fall back to general LLM response
-          const response = await invokeLLM({
-            messages: [
-              { role: "system", content: "You are a helpful assistant." },
-              { role: "user", content: input.content },
-            ],
-          });
-          
-          const rawContent = response.choices[0]?.message?.content;
-          assistantContent = typeof rawContent === "string" 
-            ? rawContent 
-            : "Sorry, I couldn't generate a response.";
-        }
-        
-        // Save assistant message
-        const assistantMessageId = await createMessage({
+
+        // 2. 대화 업데이트 시간 갱신
+        await updateConversationTimestamp(input.conversationId);
+
+        // 3. AI 응답 생성 (간단한 예시)
+        const aiResponse = await invokeLLM([
+          { role: "user", content: input.content }
+        ]);
+
+        // 4. AI 메시지 저장
+        const messageId = await createMessage({
           conversationId: input.conversationId,
           role: "assistant",
-          content: assistantContent,
-        });
-        
-        // Update conversation timestamp
-        await updateConversationTimestamp(input.conversationId);
-        
-        return {
-          userMessage: {
-            id: userMessageId,
-            role: "user" as const,
-            content: input.content,
-            createdAt: new Date(),
-          },
-          assistantMessage: {
-            id: assistantMessageId,
-            role: "assistant" as const,
-            content: assistantContent,
-            createdAt: new Date(),
-          },
-        };
-      }),
-  }),
-
-  // Admin management
-  admin: router({
-    // Get pending users for approval
-    getPendingUsers: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-      }
-      return await getPendingUsers();
-    }),
-
-    // Approve user registration
-    approveUser: protectedProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await approveUser(input.userId);
-        return { success: true };
-      }),
-
-    // Reject user registration
-    rejectUser: protectedProcedure
-      .input(z.object({ userId: z.number(), reason: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await rejectUser(input.userId, input.reason);
-        return { success: true };
-      }),
-
-    // Get all users
-    getAllUsers: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-      }
-      return await getAllUsers();
-    }),
-
-    // Get all user groups
-    getUserGroups: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-      }
-      return await getAllUserGroups();
-    }),
-
-    // Create user group
-    createUserGroup: protectedProcedure
-      .input(z.object({ name: z.string().min(1), description: z.string().optional() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        const groupId = await createUserGroup(input.name, input.description);
-        return { id: groupId };
-      }),
-
-    // Update user group
-    updateUserGroup: protectedProcedure
-      .input(z.object({ groupId: z.number(), name: z.string().min(1), description: z.string().optional() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await updateUserGroup(input.groupId, input.name, input.description);
-        return { success: true };
-      }),
-
-    // Assign user to group
-    assignUserToGroup: protectedProcedure
-      .input(z.object({ userId: z.number(), groupId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await assignUserToGroup(input.userId, input.groupId);
-        return { success: true };
-      }),
-
-    // Update user information
-    updateUser: protectedProcedure
-      .input(z.object({
-        userId: z.number(),
-        name: z.string().optional(),
-        username: z.string().optional(),
-        email: z.string().optional(),
-        password: z.string().optional(),
-        groupId: z.number().nullable().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await updateUser(input.userId, {
-          name: input.name,
-          username: input.username,
-          email: input.email,
-          password: input.password,
-          groupId: input.groupId,
-        });
-        return { success: true };
-      }),
-
-    // Get users in a group
-    getGroupMembers: protectedProcedure
-      .input(z.object({ groupId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        return await getUsersByGroupId(input.groupId);
-      }),
-
-    // Remove user from group
-    removeUserFromGroup: protectedProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can access this" });
-        }
-        await removeUserFromGroup(input.userId);
-        return { success: true };
-      }),
-  }),
-
-  // Internal file management
-  files: router({
-    // Get all internal files
-    getAll: protectedProcedure.query(async ({ ctx }) => {
-      return await getAllInternalFiles();
-    }),
-
-    // Search internal files
-    search: protectedProcedure
-      .input(z.object({ query: z.string().min(1) }))
-      .query(async ({ ctx, input }) => {
-        return await searchInternalFiles(input.query);
-      }),
-
-    // Upload internal file
-    upload: protectedProcedure
-      .input(z.object({
-        filename: z.string().min(1),
-        content: z.string().min(1),
-        mimeType: z.string().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        // Only admins can upload files
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can upload files" });
-        }
-
-        // Upload to S3
-        const fileKey = `internal-files/${ctx.user.id}/${Date.now()}-${input.filename}`;
-        const { url } = await storagePut(fileKey, input.content, input.mimeType || "text/plain");
-
-        // Save file metadata to database
-        const fileId = await createInternalFile({
-          filename: input.filename,
-          fileKey,
-          fileUrl: url,
-          mimeType: input.mimeType || "text/plain",
-          fileSize: Buffer.byteLength(input.content),
-          content: input.content,
-          uploadedBy: ctx.user.id,
+          content: aiResponse,
         });
 
-        return { id: fileId, url };
+        return { id: messageId, content: aiResponse };
       }),
 
-    // Delete internal file
-    delete: protectedProcedure
-      .input(z.object({ fileId: z.number() }))
+    deleteConversation: protectedProcedure
+      .input(z.object({ conversationId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can delete files" });
-        }
-        await deleteInternalFile(input.fileId);
+        await deleteConversation(input.conversationId, ctx.user.id);
         return { success: true };
       }),
   }),
