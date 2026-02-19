@@ -16,8 +16,26 @@ export OPENAI_MODEL="gpt-4o-mini"
 export OWNER_OPEN_ID="admin"
 export OWNER_NAME="Admin"
 
+# 환경 변수 로깅 추가
+echo "--- Environment Variables from start-prod.sh ---"
+env | grep -E "DATABASE_URL|JWT_SECRET|OAUTH_SERVER_URL|VITE_APP_ID|PORT|NODE_ENV"
+echo "--------------------------------------------------"
+
 # 프로덕션 모드로 빌드 및 서버를 실행합니다.
 cd /opt/bumjin_chatapp/Bumjin_ChatApp
 rm -rf dist
+
+echo "--- Running pnpm build ---"
 pnpm build
+BUILD_STATUS=$?
+
+if [ $BUILD_STATUS -ne 0 ]; then
+  echo "pnpm build failed. Exiting."
+  exit 1
+fi
+
+echo "--- Build successful. Listing dist directory ---"
+ls -la dist
+
+echo "--- Starting server ---"
 NODE_ENV=production node dist/index.js
