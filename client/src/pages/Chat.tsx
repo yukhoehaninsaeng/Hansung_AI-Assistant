@@ -15,13 +15,6 @@ export default function Chat() {
   const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
   const { t } = useLanguage();
   const [, navigate] = useLocation();
-
-  // Redirect to login if not authenticated after loading
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate(getLoginUrl());
-    }
-  }, [user, loading, navigate]);
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,27 +28,23 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
-  // Show loading state while authenticating
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated
-  if (!user) {
-    return null;
-  }
+  // Redirect to login if not authenticated after loading
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate(getLoginUrl());
+    }
+  }, [user, loading, navigate]);
 
   // Fetch conversations
-  const { data: conversations = [], isLoading: conversationsLoading } = trpc.conversations.list.useQuery();
+  const { data: conversations = [], isLoading: conversationsLoading } = trpc.conversations.list.useQuery(
+    undefined,
+    { enabled: !!user }
+  );
 
   // Fetch messages for selected conversation
   const { data: messages = [], isLoading: messagesLoading } = trpc.messages.list.useQuery(
     { conversationId: selectedConversationId! },
-    { enabled: selectedConversationId !== null }
+    { enabled: !!user && selectedConversationId !== null }
   );
 
   // Create conversation mutation
@@ -99,6 +88,20 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, optimisticMessages]);
+
+  // Show loading state while authenticating
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!user) {
+    return null;
+  }
 
   // Filter conversations by search query
   const filteredConversations = conversations.filter((conv) =>
