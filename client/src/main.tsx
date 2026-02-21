@@ -9,6 +9,8 @@ import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
+const trpcUrl = apiBaseUrl ? `${apiBaseUrl}/api/trpc` : "/api/trpc";
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -41,7 +43,7 @@ const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       // 절대 주소 대신 상대 경로를 사용하여 3000번/3001번 포트 문제를 해결합니다.
-      url: "/api/trpc",
+      url: trpcUrl,
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
