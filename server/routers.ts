@@ -69,7 +69,7 @@ export const appRouter = router({
         
         const token = await sdk.createSessionToken(user.id, user.username);
         
-        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions());
+        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
         
         return { success: true, user };
       }),
@@ -96,14 +96,14 @@ export const appRouter = router({
         // 회원가입 성공 후 자동 로그인을 원할 경우 아래 주석 해제 (단, 승인 절차가 있다면 주석 유지)
         /*
         const token = await sdk.createSessionToken(user.id, user.username);
-        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions());
+        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
         */
 
         return { success: true, user };
       }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
-      ctx.res.clearCookie(COOKIE_NAME, getSessionCookieOptions());
+      ctx.res.clearCookie(COOKIE_NAME, getSessionCookieOptions(ctx.req));
       return { success: true };
     }),
   }),

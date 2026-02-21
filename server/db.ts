@@ -1,5 +1,5 @@
 import { and, desc, eq, or, like } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { conversations, InsertConversation, InsertMessage, InsertUser, messages, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import bcryptjs from "bcryptjs";
@@ -26,15 +26,18 @@ export async function createLocalUser(username: string, password: string, name?:
 
   const passwordHash = await bcryptjs.hash(password, 10);
   
-  const result = await db.insert(users).values({
-    username,
-    passwordHash,
-    name: name || username,
-    loginMethod: "local",
-    lastSignedIn: new Date(),
-  });
+  const result = await db
+    .insert(users)
+    .values({
+      username,
+      passwordHash,
+      name: name || username,
+      loginMethod: "local",
+      lastSignedIn: new Date(),
+    })
+    .returning({ id: users.id });
 
-  return Number(result[0].insertId);
+  return result[0].id;
 }
 
 export async function getUserByUsername(username: string) {
@@ -117,9 +120,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: users.openId,
+        set: updateSet,
+      });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -156,8 +163,11 @@ export async function createConversation(data: InsertConversation) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(conversations).values(data);
-  return Number(result[0].insertId);
+  const result = await db
+    .insert(conversations)
+    .values(data)
+    .returning({ id: conversations.id });
+  return result[0].id;
 }
 
 export async function deleteConversation(conversationId: number, userId: number) {
@@ -204,8 +214,11 @@ export async function createMessage(data: InsertMessage) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(messages).values(data);
-  return Number(result[0].insertId);
+  const result = await db
+    .insert(messages)
+    .values(data)
+    .returning({ id: messages.id });
+  return result[0].id;
 }
 
 export async function updateConversationTimestamp(conversationId: number) {
@@ -281,9 +294,12 @@ export async function createUserGroup(name: string, description?: string) {
   if (!db) throw new Error("Database not available");
   
   const { userGroups } = await import("../drizzle/schema");
-  const result = await db.insert(userGroups).values({ name, description });
-  
-  return Number(result[0].insertId);
+  const result = await db
+    .insert(userGroups)
+    .values({ name, description })
+    .returning({ id: userGroups.id });
+
+  return result[0].id;
 }
 
 export async function updateUserGroup(groupId: number, name: string, description?: string) {
@@ -313,9 +329,12 @@ export async function createInternalFile(data: any) {
   if (!db) throw new Error("Database not available");
   
   const { internalFiles } = await import("../drizzle/schema");
-  const result = await db.insert(internalFiles).values(data);
-  
-  return Number(result[0].insertId);
+  const result = await db
+    .insert(internalFiles)
+    .values(data)
+    .returning({ id: internalFiles.id });
+
+  return result[0].id;
 }
 
 export async function searchInternalFiles(query: string) {
