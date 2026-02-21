@@ -1,17 +1,14 @@
 {
-  "buildCommand": "pnpm exec vite build",
+  "buildCommand": "pnpm run build:client",
   "outputDirectory": "dist/public",
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/[...all].ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }

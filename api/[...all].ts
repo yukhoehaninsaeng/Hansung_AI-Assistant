@@ -5,6 +5,10 @@ import { registerOAuthRoutes } from "../server/_core/oauth";
 import { createContext } from "../server/_core/context";
 import { appRouter } from "../server/routers";
 
+export const config = {
+  runtime: "nodejs",
+};
+
 const app = express();
 
 app.use(express.json({ limit: "50mb" }));

@@ -7,6 +7,7 @@
     "dev": "tsx watch server/_core/index.ts",
     "dev:vite": "vite",
     "dev:server": "tsx watch server/_core/index.ts",
+    "build:client": "vite build",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "preview": "vite preview",
     "build:server": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
