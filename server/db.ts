@@ -1,16 +1,35 @@
 import { and, desc, eq, or, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { conversations, InsertConversation, InsertMessage, InsertUser, messages, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import bcryptjs from "bcryptjs";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
+
+function getPool(): Pool | null {
+  if (_pool) return _pool;
+  if (!process.env.DATABASE_URL) return null;
+
+  const hasSslInUrl = /sslmode=require|ssl=true/i.test(process.env.DATABASE_URL);
+  const useSsl = ENV.isProduction || hasSslInUrl;
+
+  _pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+  });
+
+  return _pool;
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = getPool();
+      if (!pool) return null;
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
