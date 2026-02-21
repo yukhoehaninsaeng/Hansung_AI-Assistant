@@ -1,5 +1,6 @@
 {
   "installCommand": "cd .. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd .. && pnpm exec esbuild backend/entry.ts --bundle --platform=node --format=esm --outfile=backend/dist/handler.mjs",
   "routes": [
     {
       "src": "/(.*)",
