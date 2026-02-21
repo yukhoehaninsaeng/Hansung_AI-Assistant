@@ -147,9 +147,14 @@ export const appRouter = router({
         await updateConversationTimestamp(input.conversationId);
 
         // 3. AI 응답 생성 (간단한 예시)
-        const aiResponse = await invokeLLM([
-          { role: "user", content: input.content }
-        ]);
+        const llmResult = await invokeLLM({
+          messages: [{ role: "user", content: input.content }],
+        });
+        const aiContent = llmResult.choices[0]?.message?.content;
+        const aiResponse =
+          typeof aiContent === "string"
+            ? aiContent
+            : JSON.stringify(aiContent ?? "");
 
         // 4. AI 메시지 저장
         const messageId = await createMessage({

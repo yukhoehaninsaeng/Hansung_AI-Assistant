@@ -19,7 +19,7 @@ function getPool(): Pool | null {
     connectionString: process.env.DATABASE_URL,
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   });
-  _pool.on("error", err => {
+  _pool.on("error", (err: unknown) => {
     // Prevent unhandled 'error' events from crashing serverless runtimes.
     console.error("[Database] Pool error:", err);
   });
