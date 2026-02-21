@@ -36,21 +36,21 @@ export default function Chat() {
   }, [user, loading, navigate]);
 
   // Fetch conversations
-  const { data: conversations = [], isLoading: conversationsLoading } = trpc.conversations.list.useQuery(
+  const { data: conversations = [], isLoading: conversationsLoading } = trpc.chat.getConversations.useQuery(
     undefined,
     { enabled: !!user }
   );
 
   // Fetch messages for selected conversation
-  const { data: messages = [], isLoading: messagesLoading } = trpc.messages.list.useQuery(
+  const { data: messages = [], isLoading: messagesLoading } = trpc.chat.getMessages.useQuery(
     { conversationId: selectedConversationId! },
     { enabled: !!user && selectedConversationId !== null }
   );
 
   // Create conversation mutation
-  const createConversation = trpc.conversations.create.useMutation({
+  const createConversation = trpc.chat.createConversation.useMutation({
     onSuccess: (data) => {
-      utils.conversations.list.invalidate();
+      utils.chat.getConversations.invalidate();
       setSelectedConversationId(data.id);
       toast.success(t("chat_created"));
     },
@@ -60,9 +60,9 @@ export default function Chat() {
   });
 
   // Delete conversation mutation
-  const deleteConversation = trpc.conversations.delete.useMutation({
+  const deleteConversation = trpc.chat.deleteConversation.useMutation({
     onSuccess: () => {
-      utils.conversations.list.invalidate();
+      utils.chat.getConversations.invalidate();
       setSelectedConversationId(null);
       toast.success(t("chat_deleted"));
     },
@@ -72,10 +72,10 @@ export default function Chat() {
   });
 
   // Send message mutation
-  const sendMessage = trpc.messages.send.useMutation({
+  const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: () => {
-      utils.messages.list.invalidate();
-      utils.conversations.list.invalidate();
+      utils.chat.getMessages.invalidate();
+      utils.chat.getConversations.invalidate();
       setOptimisticMessages([]);
     },
     onError: () => {
@@ -116,7 +116,7 @@ export default function Chat() {
   const handleDeleteConversation = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(t("delete_confirmation"))) {
-      deleteConversation.mutate({ id });
+      deleteConversation.mutate({ conversationId: id });
     }
   };
 

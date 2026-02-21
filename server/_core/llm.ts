@@ -210,17 +210,26 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () => {
-  if (!ENV.forgeApiUrl || ENV.forgeApiUrl.trim().length === 0) {
-    return "https://forge.manus.im/v1/chat/completions";
+  const explicitForgeBase = ENV.forgeApiUrl?.trim();
+  if (explicitForgeBase) {
+    const base = explicitForgeBase.replace(/\/$/, "");
+    return `${base}/v1/chat/completions`;
   }
-  
-  const base = ENV.forgeApiUrl.replace(/\/$/, "");
-  return `${base}/v1/chat/completions`;
+
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  if (openAiKey) {
+    const openAiBase = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+    return `${openAiBase}/chat/completions`;
+  }
+
+  return "https://forge.manus.im/v1/chat/completions";
 };
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error(
+      "API key is not configured (set BUILT_IN_FORGE_API_KEY or OPENAI_API_KEY)"
+    );
   }
 };
 
@@ -283,8 +292,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
+  const isForgeMode = Boolean(ENV.forgeApiUrl?.trim().length);
+  const requestedMaxTokens = params.maxTokens ?? params.max_tokens;
+  const modelMaxTokens = isForgeMode ? 32768 : 16384;
+  const defaultMaxTokens = isForgeMode ? 32768 : 4096;
+  const resolvedMaxTokens = Math.min(
+    Math.max(1, requestedMaxTokens ?? defaultMaxTokens),
+    modelMaxTokens
+  );
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: process.env.OPENAI_MODEL || (isForgeMode ? "gemini-2.5-flash" : "gpt-4o-mini"),
     messages: messages.map(normalizeMessage),
   };
 
@@ -300,9 +317,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  payload.max_tokens = resolvedMaxTokens;
+  if (isForgeMode) {
+    payload.thinking = {
+      budget_tokens: 128,
+    };
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -316,14 +335,21 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const apiUrl = resolveApiUrl();
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${ENV.forgeApiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`LLM network request failed (${apiUrl}): ${reason}`);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
