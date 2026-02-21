@@ -1,0 +1,17 @@
+{
+  "buildCommand": "pnpm exec vite build",
+  "outputDirectory": "dist/public",
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/[...all].ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
