@@ -27,6 +27,7 @@ export default function Chat() {
   }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+  const trimmedSearchQuery = searchQuery.trim();
 
   // Redirect to login if not authenticated after loading
   useEffect(() => {
@@ -40,6 +41,11 @@ export default function Chat() {
     undefined,
     { enabled: !!user }
   );
+  const { data: searchedConversations = [], isLoading: searchConversationsLoading } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedSearchQuery },
+      { enabled: !!user && trimmedSearchQuery.length > 0 }
+    );
 
   // Fetch messages for selected conversation
   const { data: messages = [], isLoading: messagesLoading } = trpc.chat.getMessages.useQuery(
@@ -51,6 +57,7 @@ export default function Chat() {
   const createConversation = trpc.chat.createConversation.useMutation({
     onSuccess: (data) => {
       utils.chat.getConversations.invalidate();
+      utils.chat.searchConversations.invalidate();
       setSelectedConversationId(data.id);
       toast.success(t("chat_created"));
     },
@@ -63,6 +70,7 @@ export default function Chat() {
   const deleteConversation = trpc.chat.deleteConversation.useMutation({
     onSuccess: () => {
       utils.chat.getConversations.invalidate();
+      utils.chat.searchConversations.invalidate();
       setSelectedConversationId(null);
       toast.success(t("chat_deleted"));
     },
@@ -76,6 +84,7 @@ export default function Chat() {
     onSuccess: () => {
       utils.chat.getMessages.invalidate();
       utils.chat.getConversations.invalidate();
+      utils.chat.searchConversations.invalidate();
       setOptimisticMessages([]);
     },
     onError: () => {
@@ -103,10 +112,10 @@ export default function Chat() {
     return null;
   }
 
-  // Filter conversations by search query
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = trimmedSearchQuery ? searchedConversations : conversations;
+  const isConversationListLoading = trimmedSearchQuery
+    ? searchConversationsLoading
+    : conversationsLoading;
 
   const handleNewConversation = () => {
     const title = t("new_chat");
@@ -196,7 +205,7 @@ export default function Chat() {
 
         {/* Conversation List - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {conversationsLoading ? (
+          {isConversationListLoading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>

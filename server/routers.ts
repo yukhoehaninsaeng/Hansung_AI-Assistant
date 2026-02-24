@@ -12,6 +12,7 @@ import {
   deleteConversation,
   getConversationById,
   getConversationsByUserId,
+  searchConversationsByUserId,
   getMessagesByConversationId,
   getUserByUsername,
   updateConversationTimestamp,
@@ -203,6 +204,12 @@ export const appRouter = router({
     getConversations: protectedProcedure.query(async ({ ctx }) => {
       return getConversationsByUserId(ctx.user.id);
     }),
+
+    searchConversations: protectedProcedure
+      .input(z.object({ query: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return searchConversationsByUserId(ctx.user.id, input.query);
+      }),
 
     createConversation: protectedProcedure
       .input(z.object({ title: z.string().min(1) }))

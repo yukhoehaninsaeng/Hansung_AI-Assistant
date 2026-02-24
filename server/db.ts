@@ -1,4 +1,4 @@
-import { and, desc, eq, or, like } from "drizzle-orm";
+import { and, desc, eq, or, like, ilike } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { conversations, InsertConversation, InsertMessage, InsertUser, messages, users } from "../drizzle/schema";
@@ -180,6 +180,41 @@ export async function getConversationsByUserId(userId: number) {
     .orderBy(desc(conversations.updatedAt));
   
   return result;
+}
+
+export async function searchConversationsByUserId(userId: number, query: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const keyword = query.trim();
+  if (!keyword) {
+    return getConversationsByUserId(userId);
+  }
+
+  const pattern = `%${keyword}%`;
+  const rows = await db
+    .select({
+      conversation: conversations,
+    })
+    .from(conversations)
+    .leftJoin(messages, eq(messages.conversationId, conversations.id))
+    .where(
+      and(
+        eq(conversations.userId, userId),
+        or(
+          ilike(conversations.title, pattern),
+          ilike(messages.content, pattern),
+        ),
+      ),
+    )
+    .orderBy(desc(conversations.updatedAt));
+
+  // left join can duplicate the same conversation when multiple messages match.
+  const deduped = new Map<number, (typeof rows)[number]["conversation"]>();
+  for (const row of rows) {
+    deduped.set(row.conversation.id, row.conversation);
+  }
+  return Array.from(deduped.values());
 }
 
 export async function createConversation(data: InsertConversation) {
