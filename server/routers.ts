@@ -15,6 +15,7 @@ import {
   getMessagesByConversationId,
   getUserByUsername,
   updateConversationTimestamp,
+  updateConversationTitle,
   updateLastSignedIn,
   verifyPassword,
   getPendingUsers,
@@ -36,6 +37,95 @@ import {
 } from "./db";
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
+
+function isDefaultConversationTitle(title: string | null | undefined) {
+  const value = (title || "").trim().toLowerCase();
+  if (!value) return true;
+  return [
+    "new chat",
+    "새 채팅",
+    "새 대화",
+    "chat",
+  ].includes(value);
+}
+
+function sanitizeConversationTitle(raw: string) {
+  const singleLine = raw
+    .replace(/[\r\n]+/g, " ")
+    .replace(/^["'`[\(\s]+/, "")
+    .replace(/["'`\]\)\s]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return singleLine.slice(0, 40).trim();
+}
+
+function fallbackConversationTitleFromText(text: string) {
+  const normalized = text
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return "새 채팅";
+  return normalized.slice(0, 30).trim();
+}
+
+async function maybeAutoUpdateConversationTitle(userId: number, conversationId: number) {
+  const conversation = await getConversationById(conversationId, userId);
+  if (!conversation) return;
+
+  const msgs = await getMessagesByConversationId(conversationId);
+  if (msgs.length === 0) return;
+
+  // Only auto-title early conversations or conversations still on a generic title.
+  if (!isDefaultConversationTitle(conversation.title) && msgs.length > 4) return;
+
+  const importantMessages = msgs
+    .slice(-6)
+    .map((m) => `${m.role}: ${m.content}`)
+    .join("\n");
+
+  const firstUserMessage = msgs.find((m) => m.role === "user")?.content ?? "";
+  let nextTitle = "";
+
+  try {
+    const titleResult = await invokeLLM({
+      maxTokens: 30,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Create a short conversation title from the key points. Return only one title, no quotes, no markdown, max 20 characters.",
+        },
+        {
+          role: "user",
+          content: `Conversation:\n${importantMessages}\n\nIf needed, focus on the most important user intent.`,
+        },
+      ],
+    });
+
+    const llmContent = titleResult.choices[0]?.message?.content;
+    const raw =
+      typeof llmContent === "string"
+        ? llmContent
+        : Array.isArray(llmContent)
+          ? llmContent.map((p) => ("text" in p ? p.text : "")).join(" ")
+          : "";
+
+    nextTitle = sanitizeConversationTitle(raw);
+  } catch (error) {
+    console.warn("[ConversationTitle] LLM title generation failed:", error);
+  }
+
+  if (!nextTitle) {
+    nextTitle = fallbackConversationTitleFromText(firstUserMessage);
+  }
+
+  if (!nextTitle) return;
+  if (nextTitle === conversation.title) return;
+
+  await updateConversationTitle(conversationId, nextTitle);
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -162,6 +252,13 @@ export const appRouter = router({
           role: "assistant",
           content: aiResponse,
         });
+
+        // Best-effort auto title generation from conversation key points.
+        try {
+          await maybeAutoUpdateConversationTitle(ctx.user.id, input.conversationId);
+        } catch (error) {
+          console.warn("[ConversationTitle] Update skipped:", error);
+        }
 
         return { id: messageId, content: aiResponse };
       }),

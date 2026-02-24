@@ -254,6 +254,19 @@ export async function updateConversationTimestamp(conversationId: number) {
     .where(eq(conversations.id, conversationId));
 }
 
+export async function updateConversationTitle(conversationId: number, title: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db
+    .update(conversations)
+    .set({
+      title,
+      updatedAt: new Date(),
+    })
+    .where(eq(conversations.id, conversationId));
+}
+
 
 // Admin functions
 export async function getPendingUsers() {
