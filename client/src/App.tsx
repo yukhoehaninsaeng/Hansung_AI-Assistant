@@ -8,6 +8,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+import AdminUserSettings from "./pages/AdminUserSettings";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {
@@ -28,7 +29,11 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/login" component={() => <Redirect to="/" />} />
       <Route path="/" component={Chat} />
+      <Route path="/admin/users/:userId">
+        {(params) => <AdminUserSettings userId={Number(params.userId)} />}
+      </Route>
       <Route path="/admin" component={Admin} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

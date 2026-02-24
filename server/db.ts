@@ -416,25 +416,44 @@ export async function getAllInternalFiles() {
 
 // Update user information
 export async function updateUser(userId: number, data: {
+  openId?: string | null;
   name?: string;
   username?: string;
-  email?: string;
+  email?: string | null;
+  loginMethod?: string | null;
+  role?: "user" | "admin";
+  status?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
   password?: string;
   groupId?: number | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  lastSignedIn?: Date;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const updateData: any = {};
   
+  if (data.openId !== undefined) updateData.openId = data.openId;
   if (data.name !== undefined) updateData.name = data.name;
   if (data.username !== undefined) updateData.username = data.username;
   if (data.email !== undefined) updateData.email = data.email;
+  if (data.loginMethod !== undefined) updateData.loginMethod = data.loginMethod;
+  if (data.role !== undefined) updateData.role = data.role;
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.rejectionReason !== undefined) updateData.rejectionReason = data.rejectionReason;
   if (data.groupId !== undefined) updateData.groupId = data.groupId;
+  if (data.createdAt !== undefined) updateData.createdAt = data.createdAt;
+  if (data.updatedAt !== undefined) updateData.updatedAt = data.updatedAt;
+  if (data.lastSignedIn !== undefined) updateData.lastSignedIn = data.lastSignedIn;
   
   if (data.password !== undefined) {
     updateData.passwordHash = await bcryptjs.hash(data.password, 10);
   }
+
+  if (Object.keys(updateData).length === 0) return;
+  if (updateData.updatedAt === undefined) updateData.updatedAt = new Date();
 
   await db
     .update(users)

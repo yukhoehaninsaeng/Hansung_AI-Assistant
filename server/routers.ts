@@ -197,6 +197,18 @@ export const appRouter = router({
       return getAllUsers();
     }),
 
+    getUserById: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ input }) => {
+        const user = await getUserById(input.userId);
+        if (!user) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
+
+        const { passwordHash: _passwordHash, ...safeUser } = user;
+        return safeUser;
+      }),
+
     getUserGroups: adminProcedure.query(async () => {
       return getAllUserGroups();
     }),
@@ -237,22 +249,51 @@ export const appRouter = router({
       .input(
         z.object({
           userId: z.number(),
+          openId: z.string().nullable().optional(),
           name: z.string().optional(),
           username: z.string().optional(),
-          email: z.string().optional(),
+          email: z.string().nullable().optional(),
+          loginMethod: z.string().nullable().optional(),
+          role: z.enum(["user", "admin"]).optional(),
+          status: z.enum(["pending", "approved", "rejected"]).optional(),
+          rejectionReason: z.string().nullable().optional(),
           password: z.string().optional(),
           groupId: z.number().nullable().optional(),
+          createdAt: z.string().datetime().optional(),
+          updatedAt: z.string().datetime().optional(),
+          lastSignedIn: z.string().datetime().optional(),
         }),
       )
       .mutation(async ({ input }) => {
         await updateUser(input.userId, {
+          openId: input.openId,
           name: input.name,
           username: input.username,
           email: input.email,
+          loginMethod: input.loginMethod,
+          role: input.role,
+          status: input.status,
+          rejectionReason: input.rejectionReason,
           password: input.password,
           groupId: input.groupId,
+          createdAt: input.createdAt ? new Date(input.createdAt) : undefined,
+          updatedAt: input.updatedAt ? new Date(input.updatedAt) : undefined,
+          lastSignedIn: input.lastSignedIn ? new Date(input.lastSignedIn) : undefined,
         });
         return { success: true };
+      }),
+
+    resetUserPassword: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        const user = await getUserById(input.userId);
+        if (!user) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
+
+        const temporaryPassword = String(user.id);
+        await updateUser(user.id, { password: temporaryPassword });
+        return { success: true, temporaryPassword };
       }),
 
     getGroupMembers: adminProcedure

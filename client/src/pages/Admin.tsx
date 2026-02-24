@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { Loader2, Trash2, Check, X, ArrowLeft } from "lucide-react";
+import { Loader2, Trash2, Check, X, ArrowLeft, Settings } from "lucide-react";
 import { EditUserModal } from "@/components/EditUserModal";
 import { GroupMembersModal } from "@/components/GroupMembersModal";
 import { FileUploadComponent } from "@/components/FileUploadComponent";
@@ -259,6 +259,21 @@ export default function Admin() {
                             </td>
                             <td className="py-2 px-4">
                               {new Date(u.createdAt).toLocaleDateString("ko-KR")}
+                            </td>
+                            <td className="py-2 px-4">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/admin/users/${u.id}`);
+                                }}
+                              >
+                                <Settings className="w-4 h-4" />
+                                설정
+                              </Button>
                             </td>
                           </tr>
                         ))}
