@@ -291,7 +291,8 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
         }
 
-        const temporaryPassword = String(user.id);
+        // "사용자ID"는 로그인 아이디(username)로 해석하여 초기 비밀번호를 설정
+        const temporaryPassword = String(user.username);
         await updateUser(user.id, { password: temporaryPassword });
         return { success: true, temporaryPassword };
       }),

@@ -94,7 +94,7 @@ export default function AdminUserSettings({ userId }: Props) {
 
   const resetPasswordMutation = trpc.admin.resetUserPassword.useMutation({
     onSuccess: async (result) => {
-      toast.success(`비밀번호가 사용자 ID(${result.temporaryPassword})로 초기화되었습니다.`);
+      toast.success(`비밀번호가 로그인 아이디(${result.temporaryPassword})로 초기화되었습니다.`);
       await userQuery.refetch();
     },
     onError: (error) => {
@@ -335,7 +335,7 @@ export default function AdminUserSettings({ userId }: Props) {
                     ) : (
                       <RotateCcw className="w-4 h-4" />
                     )}
-                    Reset Password to User ID
+                    Reset Password to Login ID (username)
                   </Button>
                   <Button
                     type="button"
