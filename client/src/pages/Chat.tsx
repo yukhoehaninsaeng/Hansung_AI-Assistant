@@ -112,7 +112,19 @@ export default function Chat() {
     return null;
   }
 
-  const filteredConversations = trimmedSearchQuery ? searchedConversations : conversations;
+  const titleMatchedConversations = trimmedSearchQuery
+    ? conversations.filter((conv) =>
+        conv.title.toLowerCase().includes(trimmedSearchQuery.toLowerCase())
+      )
+    : conversations;
+
+  const filteredConversations = trimmedSearchQuery
+    ? Array.from(
+        new Map(
+          [...titleMatchedConversations, ...searchedConversations].map((conv) => [conv.id, conv])
+        ).values()
+      )
+    : conversations;
   const isConversationListLoading = trimmedSearchQuery
     ? searchConversationsLoading
     : conversationsLoading;
