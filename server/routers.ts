@@ -4,7 +4,7 @@ import { sdk } from "./_core/sdk";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createConversation,
   createMessage,
@@ -170,6 +170,144 @@ export const appRouter = router({
       .input(z.object({ conversationId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         await deleteConversation(input.conversationId, ctx.user.id);
+        return { success: true };
+      }),
+  }),
+
+  admin: router({
+    getPendingUsers: adminProcedure.query(async () => {
+      return getPendingUsers();
+    }),
+
+    approveUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await approveUser(input.userId);
+        return { success: true };
+      }),
+
+    rejectUser: adminProcedure
+      .input(z.object({ userId: z.number(), reason: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await rejectUser(input.userId, input.reason);
+        return { success: true };
+      }),
+
+    getAllUsers: adminProcedure.query(async () => {
+      return getAllUsers();
+    }),
+
+    getUserGroups: adminProcedure.query(async () => {
+      return getAllUserGroups();
+    }),
+
+    createUserGroup: adminProcedure
+      .input(
+        z.object({
+          name: z.string().min(1).max(255),
+          description: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        const id = await createUserGroup(input.name, input.description);
+        return { success: true, id };
+      }),
+
+    updateUserGroup: adminProcedure
+      .input(
+        z.object({
+          groupId: z.number(),
+          name: z.string().min(1).max(255),
+          description: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        await updateUserGroup(input.groupId, input.name, input.description);
+        return { success: true };
+      }),
+
+    assignUserToGroup: adminProcedure
+      .input(z.object({ userId: z.number(), groupId: z.number() }))
+      .mutation(async ({ input }) => {
+        await assignUserToGroup(input.userId, input.groupId);
+        return { success: true };
+      }),
+
+    updateUser: adminProcedure
+      .input(
+        z.object({
+          userId: z.number(),
+          name: z.string().optional(),
+          username: z.string().optional(),
+          email: z.string().optional(),
+          password: z.string().optional(),
+          groupId: z.number().nullable().optional(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        await updateUser(input.userId, {
+          name: input.name,
+          username: input.username,
+          email: input.email,
+          password: input.password,
+          groupId: input.groupId,
+        });
+        return { success: true };
+      }),
+
+    getGroupMembers: adminProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        return getUsersByGroupId(input.groupId);
+      }),
+
+    removeUserFromGroup: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await removeUserFromGroup(input.userId);
+        return { success: true };
+      }),
+  }),
+
+  files: router({
+    getAll: adminProcedure.query(async () => {
+      return getAllInternalFiles();
+    }),
+
+    search: adminProcedure
+      .input(z.object({ query: z.string().min(1) }))
+      .query(async ({ input }) => {
+        return searchInternalFiles(input.query);
+      }),
+
+    upload: adminProcedure
+      .input(
+        z.object({
+          filename: z.string().min(1).max(255),
+          content: z.string().min(1),
+          mimeType: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const safeName = input.filename.replace(/[\\\/]/g, "_");
+        const key = `internal-files/${Date.now()}-${safeName}`;
+        const uploaded = await storagePut(key, input.content, input.mimeType || "text/plain");
+        const fileId = await createInternalFile({
+          filename: input.filename,
+          fileKey: uploaded.key,
+          fileUrl: uploaded.url,
+          mimeType: input.mimeType || "text/plain",
+          fileSize: Buffer.byteLength(input.content, "utf8"),
+          content: input.content,
+          uploadedBy: ctx.user.id,
+        });
+        return { success: true, id: fileId, url: uploaded.url };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ fileId: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteInternalFile(input.fileId);
         return { success: true };
       }),
   }),
