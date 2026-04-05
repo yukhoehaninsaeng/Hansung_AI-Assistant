@@ -1,407 +1,918 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { trpc } from "@/lib/trpc";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { Loader2, MessageSquare, Plus, Search, Trash2, Menu, X, Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Streamdown } from "streamdown";
-import { toast } from "sonner";
-import { getLoginUrl } from "@/const";
+import {
+  AlignJustify,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Flag,
+  GraduationCap,
+  Loader2,
+  Phone,
+  Search,
+  Send,
+  Settings,
+  SquarePen,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type ViewType = "welcome" | "history" | "chat";
+type FeedbackType = "up" | "down" | "report" | null;
+
+type OptimisticMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: Date;
+};
+
+type ConvMessage = {
+  id: number | string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: Date | string;
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SUGGESTED_PROMPTS = [
+  "수강 신청 안내해주세요",
+  "수강 신청 방법이 궁금해요",
+  "수강 신청 기간 안내해주세요",
+];
+
+const HANSUNG_NAVY = "#1e3476";
+const HANSUNG_SKY = "#0098d4";
+
+// ─── WelcomeView ─────────────────────────────────────────────────────────────
+
+function WelcomeView({
+  onSendMessage,
+  messageInput,
+  setMessageInput,
+  isLoading,
+}: {
+  onSendMessage: (content?: string) => void;
+  messageInput: string;
+  setMessageInput: (v: string) => void;
+  isLoading: boolean;
+}) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSendMessage();
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Upper centered content */}
+      <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden px-6">
+        {/* HSU Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span
+            className="font-black text-gray-100"
+            style={{ fontSize: "clamp(80px, 18vw, 200px)", letterSpacing: "-0.02em" }}
+          >
+            HSU
+          </span>
+        </div>
+
+        {/* Main content */}
+        <div className="relative z-10 flex flex-col items-center text-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">
+            <span style={{ color: HANSUNG_NAVY }}>한성대학교</span>{" "}
+            <span style={{ color: HANSUNG_SKY }}>AI 도우미</span>
+          </h1>
+          <p className="text-gray-500 text-base">안녕하세요, 무엇을 도와드릴까요?</p>
+
+          {/* Feature Cards */}
+          <div className="grid grid-cols-2 gap-4 mt-5 w-full max-w-xl">
+            {/* 공지사항 card */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: HANSUNG_SKY }}
+                >
+                  <Building2 size={13} className="text-white" />
+                </div>
+                <span
+                  className="font-semibold text-sm flex items-center gap-0.5"
+                  style={{ color: HANSUNG_NAVY }}
+                >
+                  공지사항 <ChevronRight size={14} />
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                복잡하고 보기 어려운 공지사항을,
+                <br />
+                원하는 정보만 물어보면 바로 확인할 수 있어요.
+              </p>
+            </div>
+
+            {/* 입학 안내 card */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: HANSUNG_SKY }}
+                >
+                  <GraduationCap size={13} className="text-white" />
+                </div>
+                <span
+                  className="font-semibold text-sm flex items-center gap-0.5"
+                  style={{ color: HANSUNG_NAVY }}
+                >
+                  입학 안내 <ChevronRight size={14} />
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                신입생 입학에 필요한 모든 절차와 경쟁률,
+                <br />
+                주요 일정까지 한 번에 손쉽게 안내해 드립니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: prompts + input */}
+      <div className="px-8 pb-6 space-y-3">
+        {/* Suggested prompts */}
+        <div className="flex gap-2 justify-center flex-wrap">
+          {SUGGESTED_PROMPTS.map((prompt) => {
+            const [first, ...rest] = prompt.split(" ");
+            return (
+              <button
+                key={prompt}
+                onClick={() => onSendMessage(prompt)}
+                disabled={isLoading}
+                className="bg-white border border-gray-200 rounded-full px-4 py-1.5 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <span className="font-semibold text-gray-800">{first}</span>
+                {rest.length > 0 && (
+                  <span className="text-gray-500"> {rest.join(" ")}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Input */}
+        <div className="max-w-3xl mx-auto relative bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <textarea
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="질문을 입력하세요."
+            disabled={isLoading}
+            rows={3}
+            className="w-full px-5 pt-4 pb-12 text-sm text-gray-800 placeholder-gray-400 resize-none outline-none bg-transparent"
+          />
+          <div className="absolute bottom-3 right-3">
+            <button
+              onClick={() => onSendMessage()}
+              disabled={!messageInput.trim() || isLoading}
+              className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors disabled:bg-gray-200"
+              style={{ backgroundColor: messageInput.trim() && !isLoading ? HANSUNG_NAVY : undefined }}
+            >
+              {isLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Send size={15} />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── HistoryView ──────────────────────────────────────────────────────────────
+
+function HistoryView({
+  conversations,
+  searchQuery,
+  setSearchQuery,
+  isLoading,
+  onSelect,
+  onDelete,
+  selectedId,
+}: {
+  conversations: Array<{ id: number; title: string; updatedAt: Date | string }>;
+  searchQuery: string;
+  setSearchQuery: (v: string) => void;
+  isLoading: boolean;
+  onSelect: (id: number) => void;
+  onDelete: (id: number) => void;
+  selectedId: number | null;
+}) {
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
+        <h2 className="text-lg font-bold mb-3" style={{ color: HANSUNG_NAVY }}>
+          이전 기록
+        </h2>
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="대화 검색..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-full outline-none bg-gray-50 focus:bg-white focus:border-gray-300 transition-colors"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 size={24} className="animate-spin text-gray-300" />
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 py-12">
+            <Clock size={36} className="mb-3 opacity-30" />
+            <p className="text-sm">
+              {searchQuery ? "검색 결과가 없습니다" : "대화 기록이 없습니다"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1 max-w-2xl mx-auto">
+            {conversations.map((conv) => {
+              const isActive = selectedId === conv.id;
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => onSelect(conv.id)}
+                  className="group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: isActive ? HANSUNG_NAVY : undefined,
+                    color: isActive ? "white" : undefined,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive)
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9fafb";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive)
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor = "";
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{conv.title}</p>
+                    <p
+                      className="text-xs mt-0.5"
+                      style={{ color: isActive ? "rgba(255,255,255,0.6)" : "#9ca3af" }}
+                    >
+                      {new Date(conv.updatedAt).toLocaleDateString("ko-KR")}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(conv.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all"
+                    style={{ color: isActive ? "rgba(255,255,255,0.7)" : "#9ca3af" }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── ChatView ─────────────────────────────────────────────────────────────────
+
+function ChatView({
+  messages,
+  messagesLoading,
+  sendingMessage,
+  messageInput,
+  setMessageInput,
+  onSend,
+  messagesEndRef,
+  messagesContainerRef,
+  onScroll,
+  showScrollDown,
+  scrollToBottom,
+  feedbackState,
+  setFeedbackState,
+}: {
+  messages: ConvMessage[];
+  messagesLoading: boolean;
+  sendingMessage: boolean;
+  messageInput: string;
+  setMessageInput: (v: string) => void;
+  onSend: (content?: string) => void;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesContainerRef: React.RefObject<HTMLDivElement>;
+  onScroll: () => void;
+  showScrollDown: boolean;
+  scrollToBottom: () => void;
+  feedbackState: Record<string | number, FeedbackType>;
+  setFeedbackState: React.Dispatch<
+    React.SetStateAction<Record<string | number, FeedbackType>>
+  >;
+}) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSend();
+    }
+  };
+
+  const aiMessages = messages.filter((m) => m.role === "assistant");
+  const lastAiMessageId =
+    aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].id : null;
+
+  const formatDate = (date: Date | string) => {
+    const d = new Date(date);
+    return d.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full relative">
+      {/* Messages */}
+      <div
+        ref={messagesContainerRef}
+        onScroll={onScroll}
+        className="flex-1 overflow-y-auto"
+      >
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 size={28} className="animate-spin text-gray-300" />
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
+            {messages.map((msg) => {
+              const isLastAi =
+                msg.id === lastAiMessageId && !sendingMessage;
+
+              if (msg.role === "user") {
+                return (
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="bg-gray-800 text-white text-sm px-4 py-3 rounded-2xl max-w-[70%] whitespace-pre-wrap leading-relaxed">
+                      {msg.content}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={msg.id} className="flex flex-col gap-1">
+                  <div className="flex items-start gap-3">
+                    {/* AI Avatar */}
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ backgroundColor: HANSUNG_NAVY }}
+                    >
+                      <span className="text-white text-[10px] font-bold leading-none">
+                        AI
+                      </span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-500 mb-1.5">
+                        HANSUNG AI 도우미
+                      </p>
+                      <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm inline-block max-w-[85%]">
+                        <div className="text-sm text-gray-800 leading-relaxed">
+                          <Streamdown>{msg.content}</Streamdown>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        {formatDate(msg.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Feedback bar – shown after last AI message */}
+                  {isLastAi && (
+                    <div className="ml-12 mt-1">
+                      <div className="inline-flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">
+                            답변이 도움 되셨나요?
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            더 나은 서비스를 위해 소중한 의견을 반영하겠습니다.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 ml-3">
+                          {(
+                            [
+                              { type: "up" as FeedbackType, Icon: ThumbsUp, activeColor: HANSUNG_SKY },
+                              { type: "down" as FeedbackType, Icon: ThumbsDown, activeColor: HANSUNG_SKY },
+                              { type: "report" as FeedbackType, Icon: Flag, activeColor: "#ef4444" },
+                            ] as const
+                          ).map(({ type, Icon, activeColor }) => {
+                            const isActive = feedbackState[msg.id] === type;
+                            return (
+                              <button
+                                key={type}
+                                onClick={() =>
+                                  setFeedbackState((prev) => ({
+                                    ...prev,
+                                    [msg.id]: prev[msg.id] === type ? null : type,
+                                  }))
+                                }
+                                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                                style={{
+                                  backgroundColor: isActive ? activeColor : "#f3f4f6",
+                                  color: isActive ? "white" : "#6b7280",
+                                }}
+                              >
+                                <Icon size={14} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Loading indicator */}
+            {sendingMessage && (
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: HANSUNG_NAVY }}
+                >
+                  <span className="text-white text-[10px] font-bold leading-none">
+                    AI
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">
+                    HANSUNG AI 도우미
+                  </p>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                    <Loader2 size={16} className="animate-spin text-gray-400" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollDown && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute left-1/2 -translate-x-1/2 bottom-28 w-9 h-9 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+        >
+          <ChevronDown size={18} className="text-gray-500" />
+        </button>
+      )}
+
+      {/* Input area */}
+      <div className="border-t border-gray-100 px-6 py-4 flex-shrink-0">
+        <div className="max-w-3xl mx-auto">
+          <div className="relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <textarea
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder=""
+              disabled={sendingMessage}
+              rows={2}
+              className="w-full px-5 pt-3 pb-10 text-sm text-gray-800 placeholder-gray-400 resize-none outline-none bg-transparent"
+            />
+            <div className="absolute bottom-2.5 right-3">
+              <button
+                onClick={() => onSend()}
+                disabled={!messageInput.trim() || sendingMessage}
+                className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors disabled:bg-gray-200"
+                style={{
+                  backgroundColor:
+                    messageInput.trim() && !sendingMessage ? HANSUNG_NAVY : undefined,
+                }}
+              >
+                {sendingMessage ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Send size={15} />
+                )}
+              </button>
+            </div>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            한성 AI도우미는 AI이며 실수할 수 있습니다. 응답을 다시 한번 확인 주세요.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Chat Component ──────────────────────────────────────────────────────
 
 export default function Chat() {
   const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
-  const { t } = useLanguage();
   const [, navigate] = useLocation();
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [view, setView] = useState<ViewType>("welcome");
+  const [activeNav, setActiveNav] = useState<string>("새 채팅");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [optimisticMessages, setOptimisticMessages] = useState<Array<{
-    id: string;
-    role: "user" | "assistant";
-    content: string;
-    createdAt: Date;
-  }>>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const utils = trpc.useUtils();
-  const trimmedSearchQuery = searchQuery.trim();
+  const pendingMessageRef = useRef<string | null>(null);
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [feedbackState, setFeedbackState] = useState<
+    Record<string | number, FeedbackType>
+  >({});
 
-  // Redirect to login if not authenticated after loading
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const utils = trpc.useUtils();
+  const trimmedSearch = searchQuery.trim();
+
   useEffect(() => {
-    if (!loading && !user) {
-      navigate(getLoginUrl());
-    }
+    if (!loading && !user) navigate("/login");
   }, [user, loading, navigate]);
 
-  // Fetch conversations
-  const { data: conversations = [], isLoading: conversationsLoading } = trpc.chat.getConversations.useQuery(
-    undefined,
-    { enabled: !!user }
-  );
-  const { data: searchedConversations = [], isLoading: searchConversationsLoading } =
+  const { data: conversations = [], isLoading: conversationsLoading } =
+    trpc.chat.getConversations.useQuery(undefined, { enabled: !!user });
+
+  const { data: searchedConversations = [] } =
     trpc.chat.searchConversations.useQuery(
-      { query: trimmedSearchQuery },
-      { enabled: !!user && trimmedSearchQuery.length > 0 }
+      { query: trimmedSearch },
+      { enabled: !!user && trimmedSearch.length > 0 }
     );
 
-  // Fetch messages for selected conversation
-  const { data: messages = [], isLoading: messagesLoading } = trpc.chat.getMessages.useQuery(
-    { conversationId: selectedConversationId! },
-    { enabled: !!user && selectedConversationId !== null }
-  );
+  const { data: messages = [], isLoading: messagesLoading } =
+    trpc.chat.getMessages.useQuery(
+      { conversationId: selectedConversationId! },
+      { enabled: !!user && selectedConversationId !== null }
+    );
 
-  // Create conversation mutation
   const createConversation = trpc.chat.createConversation.useMutation({
     onSuccess: (data) => {
       utils.chat.getConversations.invalidate();
-      utils.chat.searchConversations.invalidate();
       setSelectedConversationId(data.id);
-      toast.success(t("chat_created"));
+      const msg = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      if (msg) {
+        sendMessage.mutate({ conversationId: data.id, content: msg });
+      }
     },
     onError: () => {
-      toast.error(t("chat_creation_failed"));
+      toast.error("대화 생성에 실패했습니다");
+      setView("welcome");
+      setOptimisticMessages([]);
     },
   });
 
-  // Delete conversation mutation
   const deleteConversation = trpc.chat.deleteConversation.useMutation({
     onSuccess: () => {
       utils.chat.getConversations.invalidate();
-      utils.chat.searchConversations.invalidate();
-      setSelectedConversationId(null);
-      toast.success(t("chat_deleted"));
+      toast.success("대화가 삭제되었습니다");
     },
-    onError: () => {
-      toast.error(t("chat_deletion_failed"));
-    },
+    onError: () => toast.error("대화 삭제에 실패했습니다"),
   });
 
-  // Send message mutation
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: () => {
       utils.chat.getMessages.invalidate();
       utils.chat.getConversations.invalidate();
-      utils.chat.searchConversations.invalidate();
       setOptimisticMessages([]);
     },
     onError: () => {
-      toast.error(t("message_send_failed"));
+      toast.error("메시지 전송에 실패했습니다");
       setOptimisticMessages([]);
     },
   });
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, optimisticMessages]);
+    if (view === "chat") {
+      const t = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [messages, optimisticMessages, view]);
 
-  // Show loading state while authenticating
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-white">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: HANSUNG_NAVY }} />
       </div>
     );
   }
 
-  // Redirect if not authenticated
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  const titleMatchedConversations = trimmedSearchQuery
-    ? conversations.filter((conv) =>
-        conv.title.toLowerCase().includes(trimmedSearchQuery.toLowerCase())
-      )
-    : conversations;
+  // ── Handlers ──
 
-  const filteredConversations = trimmedSearchQuery
-    ? Array.from(
-        new Map(
-          [...titleMatchedConversations, ...searchedConversations].map((conv) => [conv.id, conv])
-        ).values()
-      )
-    : conversations;
-  const isConversationListLoading = trimmedSearchQuery
-    ? searchConversationsLoading
-    : conversationsLoading;
-
-  const handleNewConversation = () => {
-    const title = t("new_chat");
-    createConversation.mutate({ title });
+  const handleNewChat = () => {
+    setSelectedConversationId(null);
+    setView("welcome");
+    setActiveNav("새 채팅");
+    setOptimisticMessages([]);
   };
 
-  const handleDeleteConversation = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm(t("delete_confirmation"))) {
+  const handleSelectConversation = (id: number) => {
+    setSelectedConversationId(id);
+    setView("chat");
+    setActiveNav("");
+    setOptimisticMessages([]);
+  };
+
+  const handleDeleteConversation = (id: number) => {
+    if (confirm("이 대화를 삭제하시겠습니까?")) {
       deleteConversation.mutate({ conversationId: id });
+      if (selectedConversationId === id) {
+        setSelectedConversationId(null);
+        setView("welcome");
+        setActiveNav("새 채팅");
+      }
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedConversationId) return;
-
-    const content = messageInput.trim();
+  const handleSendMessage = (content?: string) => {
+    const msg = (content !== undefined ? content : messageInput).trim();
+    if (!msg) return;
     setMessageInput("");
 
-    // Optimistic UI update
-    const optimisticId = `temp-${Date.now()}`;
     setOptimisticMessages([
       {
-        id: optimisticId,
+        id: `temp-${Date.now()}`,
         role: "user",
-        content,
+        content: msg,
         createdAt: new Date(),
       },
     ]);
+    setView("chat");
+    setActiveNav("");
 
-    sendMessage.mutate({
-      conversationId: selectedConversationId,
-      content,
-    });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+    if (!selectedConversationId) {
+      pendingMessageRef.current = msg;
+      createConversation.mutate({ title: msg.slice(0, 50) || "새 대화" });
+    } else {
+      sendMessage.mutate({ conversationId: selectedConversationId, content: msg });
     }
   };
 
-  const allMessages = [...messages, ...optimisticMessages];
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      setShowScrollDown(scrollHeight - scrollTop - clientHeight > 100);
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const filteredConversations = trimmedSearch
+    ? Array.from(
+        new Map(
+          [
+            ...conversations.filter((c) =>
+              c.title.toLowerCase().includes(trimmedSearch.toLowerCase())
+            ),
+            ...searchedConversations,
+          ].map((c) => [c.id, c])
+        ).values()
+      )
+    : conversations;
+
+  const allMessages: ConvMessage[] = [
+    ...(messages as ConvMessage[]),
+    ...optimisticMessages,
+  ];
+
+  const isLoading = createConversation.isPending || sendMessage.isPending;
+
+  // ── Sidebar nav items ──
+
+  const navItems = [
+    { label: "새 채팅", Icon: SquarePen, action: handleNewChat },
+    {
+      label: "검색",
+      Icon: Search,
+      action: () => {
+        setView("history");
+        setActiveNav("검색");
+      },
+    },
+    {
+      label: "이전 기록",
+      Icon: Clock,
+      action: () => {
+        setView("history");
+        setActiveNav("이전 기록");
+      },
+    },
+    { label: "공지사항 바로가기", Icon: Building2, action: () => {} },
+    { label: "입학안내 바로가기", Icon: GraduationCap, action: () => {} },
+    { label: "ARS안내", Icon: Phone, action: () => {} },
+  ];
+
+  // ── Render ──
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar - Fixed */}
-      <div
-        className={`${
-          sidebarOpen ? "w-80" : "w-0"
-        } border-r border-border bg-card flex flex-col transition-all duration-300 overflow-hidden relative flex-shrink-0`}
+    <div className="flex h-screen overflow-hidden bg-white">
+      {/* ── Sidebar ── */}
+      <aside
+        className="flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200"
+        style={{
+          width: sidebarCollapsed ? 60 : 200,
+          backgroundColor: HANSUNG_NAVY,
+        }}
       >
-        {/* Sidebar Header - Fixed */}
-        <div className="p-4 border-b border-border flex-shrink-0">
-          {/* Logo & Close Button */}
-          <div className="flex items-center justify-between mb-4">
-            <img src="/bumjin-logo.png" alt="BumJin" className="h-8" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(false)}
-              className="flex-shrink-0 hover:bg-primary/10"
-              title="Close sidebar"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold text-foreground">{t("chat_history")}</h1>
-            <Button onClick={handleNewConversation} size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              {t("new_chat")}
-            </Button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={t("search_chat")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Conversation List - Scrollable */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {isConversationListLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <MessageSquare className="w-12 h-12 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">
-                {searchQuery ? t("no_search_results") : t("no_conversations")}
-              </p>
-            </div>
-          ) : (
-            <div className="p-2">
-              {filteredConversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
-                  className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors mb-1 ${
-                    selectedConversationId === conv.id
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-primary/10"
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">{conv.title}</p>
-                    <p className="text-xs opacity-70">
-                      {new Date(conv.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => handleDeleteConversation(conv.id, e)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-3 flex-shrink-0" style={{ height: 60 }}>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+            style={{ color: "rgba(255,255,255,0.8)" }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                "rgba(255,255,255,0.1)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "")
+            }
+          >
+            <AlignJustify size={20} />
+          </button>
+          {!sidebarCollapsed && (
+            <span className="text-white font-bold text-[13px] whitespace-nowrap overflow-hidden">
+              HANSUNG AI 도우미
+            </span>
           )}
         </div>
 
-        {/* Bottom Section - Language & User Info & Logout - Fixed */}
-        <div className="border-t border-border flex-shrink-0 space-y-3 p-4">
-          {/* Language Selector */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{t("language")}</span>
-            <LanguageSwitch />
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-border" />
-
-          {/* User Info & Logout Row */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-foreground">{user?.name || "User"}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              {user?.role === "admin" && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigate("/admin")}
-                  title="관리자 패널"
-                >
-                  <Settings className="w-4 h-4" />
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => logout()}
-                className="px-3"
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
+          {navItems.map(({ label, Icon, action }) => {
+            const isActive = activeNav === label;
+            return (
+              <button
+                key={label}
+                onClick={() => {
+                  setActiveNav(label);
+                  action();
+                }}
+                title={sidebarCollapsed ? label : undefined}
+                className="w-full flex items-center gap-3 text-white text-[13px] transition-colors"
+                style={{
+                  padding: sidebarCollapsed ? "10px 8px" : "10px 12px",
+                  borderRadius: sidebarCollapsed ? 10 : 9999,
+                  justifyContent: sidebarCollapsed ? "center" : undefined,
+                  backgroundColor: isActive ? "rgba(255,255,255,0.2)" : undefined,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive)
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                      "rgba(255,255,255,0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive)
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
+                }}
               >
-                {t("logout")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+                <Icon size={17} className="flex-shrink-0" />
+                {!sidebarCollapsed && (
+                  <span className="truncate text-left whitespace-nowrap">{label}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with Toggle Button - Fixed */}
-        <div className="border-b border-border bg-card p-4 flex items-center gap-2 flex-shrink-0">
-          {!sidebarOpen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              className="flex-shrink-0 hover:bg-primary/10"
-              title="Open sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
+        {/* Footer */}
+        <div
+          className="p-3 flex-shrink-0"
+          style={{ display: "flex", justifyContent: sidebarCollapsed ? "center" : "flex-start" }}
+        >
+          <button
+            className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
+            style={{ color: "rgba(255,255,255,0.6)" }}
+            title="설정"
+            onClick={() => user?.role === "admin" && navigate("/admin")}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                "rgba(255,255,255,0.1)";
+              (e.currentTarget as HTMLButtonElement).style.color = "white";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
+              (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.6)";
+            }}
+          >
+            <Settings size={19} />
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <div className="flex justify-end items-center flex-shrink-0 gap-2 px-4" style={{ height: 56 }}>
+          <button
+            onClick={() => logout()}
+            className="text-white text-sm font-medium rounded-full px-4 py-1.5 transition-colors"
+            style={{ backgroundColor: HANSUNG_NAVY }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#162b5e")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = HANSUNG_NAVY)
+            }
+          >
+            로그아웃
+          </button>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-gray-400 hover:bg-gray-100"
+            onClick={() => user?.role === "admin" && navigate("/admin")}
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {view === "welcome" && (
+            <WelcomeView
+              onSendMessage={handleSendMessage}
+              messageInput={messageInput}
+              setMessageInput={setMessageInput}
+              isLoading={isLoading}
+            />
+          )}
+
+          {view === "history" && (
+            <HistoryView
+              conversations={filteredConversations}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              isLoading={conversationsLoading}
+              onSelect={handleSelectConversation}
+              onDelete={handleDeleteConversation}
+              selectedId={selectedConversationId}
+            />
+          )}
+
+          {view === "chat" && (
+            <ChatView
+              messages={allMessages}
+              messagesLoading={messagesLoading}
+              sendingMessage={isLoading}
+              messageInput={messageInput}
+              setMessageInput={setMessageInput}
+              onSend={handleSendMessage}
+              messagesEndRef={messagesEndRef}
+              messagesContainerRef={messagesContainerRef}
+              onScroll={handleScroll}
+              showScrollDown={showScrollDown}
+              scrollToBottom={scrollToBottom}
+              feedbackState={feedbackState}
+              setFeedbackState={setFeedbackState}
+            />
           )}
         </div>
-
-        {selectedConversationId ? (
-          <>
-            {/* Messages - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {messagesLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : allMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <MessageSquare className="w-16 h-16 text-muted-foreground mb-4" />
-                  <h2 className="text-xl font-semibold mb-2 text-foreground">{t("start_conversation")}</h2>
-                  <p className="text-muted-foreground">{t("start_conversation_desc")}</p>
-                </div>
-              ) : (
-                <div className="max-w-4xl mx-auto space-y-6">
-                  {allMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                          msg.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card border border-border text-card-foreground"
-                        }`}
-                      >
-                        {msg.role === "assistant" ? (
-                          <Streamdown>{msg.content}</Streamdown>
-                        ) : (
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {sendMessage.isPending && (
-                    <div className="flex justify-start">
-                      <div className="bg-card border border-border rounded-2xl px-4 py-3">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Input Area - Fixed */}
-            <div className="border-t border-border bg-card p-4 flex-shrink-0">
-              <div className="max-w-4xl mx-auto flex gap-3">
-                <Input
-                  placeholder={t("message_placeholder")}
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={sendMessage.isPending}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || sendMessage.isPending}
-                >
-                  {t("send")}
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <MessageSquare className="w-20 h-20 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-2xl font-semibold mb-2 text-foreground">
-                {user?.name}{t("welcome")}
-              </h2>
-              <p className="text-muted-foreground mb-6">{t("select_or_create")}</p>
-              <Button onClick={handleNewConversation} className="gap-2">
-                <Plus className="w-4 h-4" />
-                {t("start_new_chat")}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }
