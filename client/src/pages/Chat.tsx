@@ -37,7 +37,7 @@ type OptimisticMessage = {
 
 type ConvMessage = {
   id: number | string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   createdAt: Date | string;
 };
@@ -60,11 +60,17 @@ function WelcomeView({
   messageInput,
   setMessageInput,
   isLoading,
+  onNoticeClick,
+  onAdmissionClick,
+  isModeLoading,
 }: {
   onSendMessage: (content?: string) => void;
   messageInput: string;
   setMessageInput: (v: string) => void;
   isLoading: boolean;
+  onNoticeClick: () => void;
+  onAdmissionClick: () => void;
+  isModeLoading: boolean;
 }) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -98,13 +104,17 @@ function WelcomeView({
           {/* Feature Cards */}
           <div className="grid grid-cols-2 gap-4 mt-5 w-full max-w-xl">
             {/* 공지사항 card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+            <button
+              onClick={onNoticeClick}
+              disabled={isModeLoading}
+              className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: HANSUNG_SKY }}
                 >
-                  <Building2 size={13} className="text-white" />
+                  {isModeLoading ? <Loader2 size={13} className="text-white animate-spin" /> : <Building2 size={13} className="text-white" />}
                 </div>
                 <span
                   className="font-semibold text-sm flex items-center gap-0.5"
@@ -118,16 +128,20 @@ function WelcomeView({
                 <br />
                 원하는 정보만 물어보면 바로 확인할 수 있어요.
               </p>
-            </div>
+            </button>
 
             {/* 입학 안내 card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+            <button
+              onClick={onAdmissionClick}
+              disabled={isModeLoading}
+              className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <div className="flex items-center gap-2 mb-2">
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: HANSUNG_SKY }}
                 >
-                  <GraduationCap size={13} className="text-white" />
+                  {isModeLoading ? <Loader2 size={13} className="text-white animate-spin" /> : <GraduationCap size={13} className="text-white" />}
                 </div>
                 <span
                   className="font-semibold text-sm flex items-center gap-0.5"
@@ -141,7 +155,7 @@ function WelcomeView({
                 <br />
                 주요 일정까지 한 번에 손쉽게 안내해 드립니다.
               </p>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -345,7 +359,9 @@ function ChatView({
     }
   };
 
-  const aiMessages = messages.filter((m) => m.role === "assistant");
+  // system 메시지는 UI에 표시하지 않음
+  const displayMessages = messages.filter((m) => m.role !== "system");
+  const aiMessages = displayMessages.filter((m) => m.role === "assistant");
   const lastAiMessageId =
     aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].id : null;
 
@@ -374,7 +390,7 @@ function ChatView({
           </div>
         ) : (
           <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-            {messages.map((msg) => {
+            {displayMessages.map((msg) => {
               const isLastAi =
                 msg.id === lastAiMessageId && !sendingMessage;
 
@@ -595,6 +611,17 @@ export default function Chat() {
       setView("welcome");
       setOptimisticMessages([]);
     },
+  });
+
+  const startModeConversation = trpc.chat.startModeConversation.useMutation({
+    onSuccess: (data) => {
+      utils.chat.getConversations.invalidate();
+      setSelectedConversationId(data.conversationId);
+      setView("chat");
+      setActiveNav("");
+      setOptimisticMessages([]);
+    },
+    onError: () => toast.error("대화를 시작하지 못했습니다. 잠시 후 다시 시도해주세요."),
   });
 
   const deleteConversation = trpc.chat.deleteConversation.useMutation({
@@ -923,6 +950,9 @@ export default function Chat() {
               messageInput={messageInput}
               setMessageInput={setMessageInput}
               isLoading={isLoading}
+              onNoticeClick={() => startModeConversation.mutate({ mode: "notice" })}
+              onAdmissionClick={() => startModeConversation.mutate({ mode: "admission" })}
+              isModeLoading={startModeConversation.isPending}
             />
           )}
 

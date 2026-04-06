@@ -39,6 +39,35 @@ import {
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
 
+// ── 웹 페이지 텍스트 추출 헬퍼 ──────────────────────────────────────────────
+
+async function fetchPageText(url: string, maxChars = 7000): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    const html = await res.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#\d+;/g, "")
+      .replace(/\s+/g, " ").trim();
+    return text.slice(0, maxChars);
+  } catch {
+    return "";
+  }
+}
+
+// ── 대화 제목 자동 생성 ────────────────────────────────────────────────────
+
 function isDefaultConversationTitle(title: string | null | undefined) {
   const value = (title || "").trim().toLowerCase();
   if (!value) return true;
@@ -243,9 +272,15 @@ export const appRouter = router({
         // 2. 대화 업데이트 시간 갱신
         await updateConversationTimestamp(input.conversationId);
 
-        // 3. AI 응답 생성 (간단한 예시)
+        // 3. 전체 대화 히스토리 로드 (system prompt 포함)
+        const history = await getMessagesByConversationId(input.conversationId);
+
+        // 4. AI 응답 생성 (전체 히스토리를 컨텍스트로 전달)
         const llmResult = await invokeLLM({
-          messages: [{ role: "user", content: input.content }],
+          messages: history.map(m => ({
+            role: m.role as "system" | "user" | "assistant",
+            content: m.content,
+          })),
         });
         const aiContent = llmResult.choices[0]?.message?.content;
         const aiResponse =
@@ -253,7 +288,7 @@ export const appRouter = router({
             ? aiContent
             : JSON.stringify(aiContent ?? "");
 
-        // 4. AI 메시지 저장
+        // 5. AI 메시지 저장
         const messageId = await createMessage({
           conversationId: input.conversationId,
           role: "assistant",
@@ -268,6 +303,95 @@ export const appRouter = router({
         }
 
         return { id: messageId, content: aiResponse };
+      }),
+
+    // 공지사항/입학안내 카드 클릭 시 전용 대화 시작
+    startModeConversation: protectedProcedure
+      .input(z.object({ mode: z.enum(["notice", "admission"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const isNotice = input.mode === "notice";
+
+        // 1. 대화 생성
+        const title = isNotice ? "공지사항 요약" : "입학 안내 도우미";
+        const convId = await createConversation({ userId: ctx.user.id, title });
+
+        // 2. 모드별 시스템 프롬프트 및 웹 크롤링
+        let systemContent: string;
+        let firstUserContent: string | null = null;
+
+        if (isNotice) {
+          const pageText = await fetchPageText("https://www.hansung.ac.kr/hansung/6172/subview.do");
+          systemContent = [
+            "당신은 한성대학교 AI 도우미입니다. 아래는 한성대학교 공지사항 게시판에서 가져온 내용입니다.",
+            "",
+            "=== 공지사항 페이지 내용 ===",
+            pageText || "(페이지 내용을 불러오지 못했습니다. 한성대학교 공지사항에 대해 일반적인 안내를 제공해주세요.)",
+            "=========================",
+            "",
+            "위 내용을 바탕으로 사용자 질문에 친절하고 정확하게 답변해주세요. 반드시 한국어로 답변하세요.",
+          ].join("\n");
+          firstUserContent = "위 공지사항 내용에서 가장 최신 게시글 3개를 찾아서 번호, 제목, 날짜, 핵심 내용을 포함하여 알기 쉽게 요약해줘.";
+        } else {
+          const pageText = await fetchPageText("https://enter.hansung.ac.kr/?m1=home", 4000);
+          systemContent = [
+            "당신은 한성대학교 입학처 AI 도우미입니다. 입학에 관한 모든 질문에 친절하고 전문적으로 답변해주세요.",
+            "",
+            ...(pageText ? [
+              "=== 입학처 홈페이지 참고 내용 ===",
+              pageText,
+              "================================",
+              "",
+            ] : []),
+            "주요 안내 영역:",
+            "- 수시/정시 모집요강 및 지원 방법",
+            "- 전형별 안내: 학생부교과전형, 학생부종합전형, 논술전형, 실기/실적전형 등",
+            "- 입시 일정 및 중요 공지사항",
+            "- 학생부종합전형 평가기준 (학업역량, 전공적합성, 인성, 발전가능성)",
+            "- 입시설명회 일정 및 등록 방법",
+            "- 학생부종합전형 가이드북 내용",
+            "",
+            "📞 입학처 대표 전화: 02-760-5800",
+            "🌐 입학처 홈페이지: https://enter.hansung.ac.kr",
+            "",
+            "불확실하거나 최신 정보가 필요한 경우에는 입학처에 직접 문의를 권장하세요. 반드시 한국어로 답변하세요.",
+          ].join("\n");
+        }
+
+        // 3. 시스템 메시지 저장 (UI에 미표시)
+        await createMessage({ conversationId: convId, role: "system", content: systemContent });
+
+        // 4. 공지사항 모드: 사용자 요청 메시지 저장
+        if (firstUserContent) {
+          await createMessage({ conversationId: convId, role: "user", content: firstUserContent });
+        }
+
+        // 5. LLM 컨텍스트 구성
+        const history = await getMessagesByConversationId(convId);
+        const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+          ...history.map(m => ({
+            role: m.role as "system" | "user" | "assistant",
+            content: m.content,
+          })),
+        ];
+
+        // 입학 모드: 히스토리에 없는 시작 유도 메시지 임시 추가
+        if (!isNotice) {
+          llmMessages.push({
+            role: "user",
+            content: "안녕하세요! 입학 안내 도우미로 시작합니다. 자기소개와 함께 어떤 도움을 드릴 수 있는지 알기 쉽게 안내해주세요.",
+          });
+        }
+
+        // 6. AI 응답 생성
+        const llmResult = await invokeLLM({ messages: llmMessages });
+        const aiContent = llmResult.choices[0]?.message?.content;
+        const aiResponse = typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
+
+        // 7. AI 응답 저장
+        await createMessage({ conversationId: convId, role: "assistant", content: aiResponse });
+        await updateConversationTimestamp(convId);
+
+        return { conversationId: convId, aiResponse };
       }),
 
     deleteConversation: protectedProcedure
