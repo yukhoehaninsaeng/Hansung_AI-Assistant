@@ -571,6 +571,8 @@ export default function Chat() {
     Record<string | number, FeedbackType>
   >({});
   const [showArsModal, setShowArsModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -588,6 +590,13 @@ export default function Chat() {
     trpc.chat.searchConversations.useQuery(
       { query: trimmedSearch },
       { enabled: !!user && trimmedSearch.length > 0 }
+    );
+
+  const trimmedModalSearch = modalSearchQuery.trim();
+  const { data: modalSearchedConversations = [] } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedModalSearch },
+      { enabled: !!user && trimmedModalSearch.length > 0 }
     );
 
   const { data: messages = [], isLoading: messagesLoading } =
@@ -753,8 +762,8 @@ export default function Chat() {
       label: "검색",
       Icon: Search,
       action: () => {
-        setView("history");
-        setActiveNav("검색");
+        setModalSearchQuery("");
+        setShowSearchModal(true);
       },
     },
     {
@@ -916,6 +925,119 @@ export default function Chat() {
           </div>
         </div>
       )}
+
+      {/* ── Search Modal ── */}
+      {showSearchModal && (() => {
+        const trimmed = modalSearchQuery.trim();
+        const modalConversations = trimmed
+          ? Array.from(
+              new Map(
+                [
+                  ...conversations.filter((c) =>
+                    c.title.toLowerCase().includes(trimmed.toLowerCase())
+                  ),
+                  ...modalSearchedConversations,
+                ].map((c) => [c.id, c])
+              ).values()
+            )
+          : conversations;
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center pt-20"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            onClick={() => setShowSearchModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Search input */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                <Search size={16} className="text-gray-400 flex-shrink-0" />
+                <input
+                  autoFocus
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
+                  placeholder="대화 내용 검색..."
+                  className="flex-1 text-sm text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+                  onKeyDown={(e) => e.key === "Escape" && setShowSearchModal(false)}
+                />
+                {modalSearchQuery && (
+                  <button
+                    onClick={() => setModalSearchQuery("")}
+                    className="text-gray-400 hover:text-gray-600 text-xs px-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Results */}
+              <div className="max-h-96 overflow-y-auto">
+                {conversationsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 size={20} className="animate-spin text-gray-300" />
+                  </div>
+                ) : modalConversations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <Clock size={30} className="mb-2 opacity-30" />
+                    <p className="text-sm">
+                      {trimmed ? "검색 결과가 없습니다" : "대화 기록이 없습니다"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2">
+                    {trimmed && (
+                      <p className="text-xs text-gray-400 px-2 py-1.5 font-medium">
+                        검색 결과 {modalConversations.length}개
+                      </p>
+                    )}
+                    {modalConversations.map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => {
+                          handleSelectConversation(conv.id);
+                          setShowSearchModal(false);
+                          setModalSearchQuery("");
+                        }}
+                        className="w-full text-left flex items-center justify-between px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {conv.title}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(conv.updatedAt).toLocaleDateString("ko-KR", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 ml-2 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between">
+                <p className="text-xs text-gray-400">
+                  총 {conversations.length}개의 대화
+                </p>
+                <button
+                  onClick={() => setShowSearchModal(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 font-medium px-2 py-1 rounded transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Main ── */}
       <main className="flex-1 flex flex-col overflow-hidden">
