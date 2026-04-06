@@ -683,6 +683,27 @@ export const appRouter = router({
         return { success: true, id: fileId, url: uploaded.url };
       }),
 
+    // 텍스트 직접 입력 저장 (스토리지 불필요, DB에만 저장)
+    saveText: adminProcedure
+      .input(
+        z.object({
+          title: z.string().min(1).max(255),
+          content: z.string().min(1),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const fileId = await createInternalFile({
+          filename: input.title.endsWith(".txt") ? input.title : `${input.title}.txt`,
+          fileKey: `text-direct/${Date.now()}`,
+          fileUrl: "",
+          mimeType: "text/plain",
+          fileSize: Buffer.byteLength(input.content, "utf8"),
+          content: input.content,
+          uploadedBy: ctx.user.id,
+        });
+        return { success: true, id: fileId };
+      }),
+
     delete: adminProcedure
       .input(z.object({ fileId: z.number() }))
       .mutation(async ({ input }) => {
