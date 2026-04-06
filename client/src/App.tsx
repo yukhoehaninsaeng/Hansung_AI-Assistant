@@ -9,6 +9,7 @@ import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import AdminUserSettings from "./pages/AdminUserSettings";
+import PublicChat from "./pages/PublicChat";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/guest" component={PublicChat} />
         <Route path="/login" component={Login} />
         <Route component={() => <Redirect to="/login" />} />
       </Switch>
@@ -29,6 +31,7 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/guest" component={PublicChat} />
       <Route path="/login" component={() => <Redirect to="/" />} />
       <Route path="/" component={Chat} />
       <Route path="/admin/users/:userId">

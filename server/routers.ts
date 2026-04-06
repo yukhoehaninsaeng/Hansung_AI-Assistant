@@ -328,6 +328,30 @@ export const appRouter = router({
 
   // 채팅 관련 라우터
   chat: router({
+    // 로그인 없이 사용 가능한 공개 채팅 (대화 기록 저장 없음)
+    publicChat: publicProcedure
+      .input(z.object({
+        messages: z.array(z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().min(1),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        const [files, webContext] = await Promise.all([
+          getAllInternalFiles().catch(() => []),
+          input.messages.length > 0
+            ? searchWeb(input.messages[input.messages.length - 1].content)
+            : Promise.resolve(""),
+        ]);
+        const fileContext = buildFileContext(files);
+        const llmMessages = buildMessagesWithContext(input.messages, fileContext, webContext);
+        const llmResult = await invokeLLM({ messages: llmMessages });
+        const aiContent = llmResult.choices[0]?.message?.content;
+        return {
+          content: typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? ""),
+        };
+      }),
+
     getConversations: protectedProcedure.query(async ({ ctx }) => {
       return getConversationsByUserId(ctx.user.id);
     }),
