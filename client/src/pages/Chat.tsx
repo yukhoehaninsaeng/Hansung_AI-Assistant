@@ -560,6 +560,7 @@ export default function Chat() {
   const [feedbackState, setFeedbackState] = useState<
     Record<string | number, FeedbackType>
   >({});
+  const [showArsModal, setShowArsModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -743,9 +744,17 @@ export default function Chat() {
         setActiveNav("이전 기록");
       },
     },
-    { label: "공지사항 바로가기", Icon: Building2, action: () => {} },
-    { label: "입학안내 바로가기", Icon: GraduationCap, action: () => {} },
-    { label: "ARS안내", Icon: Phone, action: () => {} },
+    {
+      label: "공지사항 바로가기",
+      Icon: Building2,
+      action: () => window.open("https://www.hansung.ac.kr/hansung/6172/subview.do", "_blank"),
+    },
+    {
+      label: "입학안내 바로가기",
+      Icon: GraduationCap,
+      action: () => window.open("https://enter.hansung.ac.kr/?m1=home", "_blank"),
+    },
+    { label: "ARS안내", Icon: Phone, action: () => setShowArsModal(true) },
   ];
 
   // ── Render ──
@@ -845,6 +854,47 @@ export default function Chat() {
           </button>
         </div>
       </aside>
+
+      {/* ── ARS Modal ── */}
+      {showArsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          onClick={() => setShowArsModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 w-72"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold mb-4" style={{ color: HANSUNG_NAVY }}>
+              전화 안내
+            </h2>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <span className="text-xl">☎️</span>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">ARS안내</p>
+                  <p className="text-base font-bold text-gray-800">1544-4113</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <span className="text-xl">🏫</span>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">입학안내</p>
+                  <p className="text-base font-bold text-gray-800">02-760-5800</p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowArsModal(false)}
+              className="mt-4 w-full py-2 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: HANSUNG_NAVY }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Main ── */}
       <main className="flex-1 flex flex-col overflow-hidden">
