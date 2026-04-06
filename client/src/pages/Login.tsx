@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import bumjinLogo from "/bumjinicon.png";
+import bumjinLogo from "/Hansung UI.webp";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -70,7 +70,7 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-lg">
         <div className="p-8">
           <div className="flex justify-center mb-8">
-            <img src={bumjinLogo} alt="BumJin" className="h-16 object-contain" />
+            <img src={bumjinLogo} alt="한성대학교" className="h-16 object-contain" />
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2 text-gray-900">

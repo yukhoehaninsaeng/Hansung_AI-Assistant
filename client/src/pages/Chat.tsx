@@ -392,14 +392,11 @@ function ChatView({
                 <div key={msg.id} className="flex flex-col gap-1">
                   <div className="flex items-start gap-3">
                     {/* AI Avatar */}
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ backgroundColor: HANSUNG_NAVY }}
-                    >
-                      <span className="text-white text-[10px] font-bold leading-none">
-                        AI
-                      </span>
-                    </div>
+                    <img
+                      src="/ai_profile.jpg"
+                      alt="HANSUNG AI"
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0 mt-0.5"
+                    />
 
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-500 mb-1.5">
@@ -467,14 +464,11 @@ function ChatView({
             {/* Loading indicator */}
             {sendingMessage && (
               <div className="flex items-start gap-3">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: HANSUNG_NAVY }}
-                >
-                  <span className="text-white text-[10px] font-bold leading-none">
-                    AI
-                  </span>
-                </div>
+                <img
+                  src="/ai_profile.jpg"
+                  alt="HANSUNG AI"
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                />
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-1.5">
                     HANSUNG AI 도우미
