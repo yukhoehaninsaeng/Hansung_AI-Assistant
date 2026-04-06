@@ -12,6 +12,7 @@ import {
   Flag,
   GraduationCap,
   Loader2,
+  LogOut,
   Phone,
   Search,
   Send,
@@ -20,6 +21,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  User,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -573,6 +575,7 @@ export default function Chat() {
   const [showArsModal, setShowArsModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -754,6 +757,17 @@ export default function Chat() {
 
   const isLoading = createConversation.isPending || sendMessage.isPending;
 
+  // ── User helpers ──
+
+  const userDisplayName = user.name || user.username || "사용자";
+  const userInitials = userDisplayName
+    .split(" ")
+    .map((w: string) => w.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const userRoleLabel = user.role === "admin" ? "관리자" : "학생";
+
   // ── Sidebar nav items ──
 
   const navItems = [
@@ -860,27 +874,109 @@ export default function Chat() {
           })}
         </nav>
 
-        {/* Footer */}
-        <div
-          className="p-3 flex-shrink-0"
-          style={{ display: "flex", justifyContent: sidebarCollapsed ? "center" : "flex-start" }}
-        >
+        {/* Footer – User profile */}
+        <div className="p-2 flex-shrink-0 relative">
+          {/* User menu popup */}
+          {showUserMenu && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowUserMenu(false)}
+              />
+              {/* Menu card */}
+              <div
+                className="absolute z-50 bg-white rounded-2xl shadow-2xl overflow-hidden"
+                style={{
+                  bottom: "calc(100% + 8px)",
+                  left: sidebarCollapsed ? 60 : 8,
+                  right: sidebarCollapsed ? "auto" : 8,
+                  width: sidebarCollapsed ? 200 : undefined,
+                  minWidth: 180,
+                }}
+              >
+                {/* User info header */}
+                <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-sm font-bold"
+                    style={{ backgroundColor: "#f97316" }}
+                  >
+                    {userInitials}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{userDisplayName}</p>
+                    <p className="text-xs text-gray-400 truncate">@{user.username}</p>
+                  </div>
+                </div>
+
+                {/* Menu items */}
+                <div className="py-1">
+                  <button
+                    onClick={() => setShowUserMenu(false)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <User size={15} className="flex-shrink-0 text-gray-400" />
+                    프로필
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (user?.role === "admin") navigate("/admin");
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <Settings size={15} className="flex-shrink-0 text-gray-400" />
+                    설정
+                  </button>
+                  <div className="h-px bg-gray-100 my-1" />
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
+                  >
+                    <LogOut size={15} className="flex-shrink-0" />
+                    로그아웃
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Avatar button */}
           <button
-            className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
-            style={{ color: "rgba(255,255,255,0.6)" }}
-            title="설정"
-            onClick={() => user?.role === "admin" && navigate("/admin")}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                "rgba(255,255,255,0.1)";
-              (e.currentTarget as HTMLButtonElement).style.color = "white";
+            onClick={() => setShowUserMenu((v) => !v)}
+            title={sidebarCollapsed ? userDisplayName : undefined}
+            className="w-full flex items-center gap-2.5 rounded-xl transition-colors"
+            style={{
+              padding: sidebarCollapsed ? "8px" : "8px 10px",
+              justifyContent: sidebarCollapsed ? "center" : undefined,
             }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-              (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.6)";
-            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                "rgba(255,255,255,0.1)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "")
+            }
           >
-            <Settings size={19} />
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+              style={{ backgroundColor: "#f97316" }}
+            >
+              {userInitials}
+            </div>
+            {!sidebarCollapsed && (
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-white text-xs font-semibold truncate leading-tight">
+                  {userDisplayName}
+                </p>
+                <p className="text-xs truncate leading-tight" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  {userRoleLabel}
+                </p>
+              </div>
+            )}
           </button>
         </div>
       </aside>
