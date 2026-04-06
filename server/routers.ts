@@ -66,6 +66,104 @@ async function fetchPageText(url: string, maxChars = 7000): Promise<string> {
   }
 }
 
+// ── RAG: 파일 컨텍스트 빌더 ─────────────────────────────────────────────────
+
+function buildFileContext(files: Array<{ filename: string; content?: string | null }>): string {
+  if (!files.length) return "";
+  const MAX_PER_FILE = 4000;
+  const MAX_TOTAL = 18000;
+  let total = 0;
+  const parts: string[] = [];
+
+  for (const file of files) {
+    const content = (file.content || "").trim().slice(0, MAX_PER_FILE);
+    if (!content) continue;
+    if (total + content.length > MAX_TOTAL) break;
+    parts.push(`📄 [문서명: ${file.filename}]\n${content}`);
+    total += content.length;
+  }
+
+  return parts.join("\n\n---\n\n");
+}
+
+// ── 웹 검색 헬퍼 (DuckDuckGo 기반) ─────────────────────────────────────────
+
+async function searchWeb(query: string): Promise<string> {
+  try {
+    // 한성대학교 맥락으로 검색
+    const searchQuery = `한성대학교 ${query}`;
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+    const text = await Promise.race([
+      fetchPageText(url, 2500),
+      new Promise<string>((resolve) => setTimeout(() => resolve(""), 6000)),
+    ]);
+    return text || "";
+  } catch {
+    return "";
+  }
+}
+
+// ── LLM 메시지 배열 구성 (파일 + 웹 컨텍스트 주입) ──────────────────────────
+
+function buildMessagesWithContext(
+  history: Array<{ role: string; content: string }>,
+  fileContext: string,
+  webContext: string
+): Array<{ role: "system" | "user" | "assistant"; content: string }> {
+  const knowledgeSections: string[] = [];
+  if (fileContext) {
+    knowledgeSections.push(
+      "## 📁 내부 지식 문서 (최우선 참고 — 이 내용을 기반으로 먼저 답변하세요)\n\n" + fileContext
+    );
+  }
+  if (webContext) {
+    knowledgeSections.push(
+      "## 🌐 웹 검색 결과 (내부 문서에 없는 내용 보완 참고)\n\n" + webContext
+    );
+  }
+  const knowledgeBlock = knowledgeSections.join("\n\n");
+
+  const baseInstruction = [
+    "당신은 한성대학교 AI 도우미입니다.",
+    "",
+    "【답변 원칙】",
+    "1. 내부 문서에 관련 내용이 있으면 반드시 해당 내용을 근거로 답변하세요.",
+    "2. 내부 문서에 없는 내용은 웹 검색 결과를 참고하여 답변하세요.",
+    "3. 두 곳 모두에 없는 경우 일반 지식으로 답변하되, 공식 홈페이지(www.hansung.ac.kr) 확인을 권장하세요.",
+    "4. 항상 친절하고 정확하게, 한국어로 답변하세요.",
+  ].join("\n");
+
+  const hasSystemMsg = history.some((m) => m.role === "system");
+
+  if (hasSystemMsg) {
+    // 기존 system 메시지에 파일·웹 컨텍스트 추가
+    return history.map((m) => {
+      if (m.role === "system") {
+        return {
+          role: "system" as const,
+          content: knowledgeBlock
+            ? `${m.content}\n\n${knowledgeBlock}`
+            : m.content,
+        };
+      }
+      return { role: m.role as "user" | "assistant", content: m.content };
+    });
+  }
+
+  // system 메시지 없으면 새로 추가
+  const systemContent = knowledgeBlock
+    ? `${baseInstruction}\n\n${knowledgeBlock}`
+    : baseInstruction;
+
+  return [
+    { role: "system" as const, content: systemContent },
+    ...history.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+  ];
+}
+
 // ── 대화 제목 자동 생성 ────────────────────────────────────────────────────
 
 function isDefaultConversationTitle(title: string | null | undefined) {
@@ -268,34 +366,35 @@ export const appRouter = router({
           role: "user",
           content: input.content,
         });
-
-        // 2. 대화 업데이트 시간 갱신
         await updateConversationTimestamp(input.conversationId);
 
-        // 3. 전체 대화 히스토리 로드 (system prompt 포함)
+        // 2. 전체 대화 히스토리 로드 (system prompt 포함)
         const history = await getMessagesByConversationId(input.conversationId);
 
-        // 4. AI 응답 생성 (전체 히스토리를 컨텍스트로 전달)
-        const llmResult = await invokeLLM({
-          messages: history.map(m => ({
-            role: m.role as "system" | "user" | "assistant",
-            content: m.content,
-          })),
-        });
+        // 3. 내부 문서 + 웹 검색 병렬 로드
+        const [files, webContext] = await Promise.all([
+          getAllInternalFiles().catch(() => []),
+          searchWeb(input.content),
+        ]);
+        const fileContext = buildFileContext(files);
+
+        // 4. 파일·웹 컨텍스트를 주입한 메시지 배열 구성
+        const llmMessages = buildMessagesWithContext(history, fileContext, webContext);
+
+        // 5. AI 응답 생성
+        const llmResult = await invokeLLM({ messages: llmMessages });
         const aiContent = llmResult.choices[0]?.message?.content;
         const aiResponse =
-          typeof aiContent === "string"
-            ? aiContent
-            : JSON.stringify(aiContent ?? "");
+          typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
 
-        // 5. AI 메시지 저장
+        // 6. AI 메시지 저장
         const messageId = await createMessage({
           conversationId: input.conversationId,
           role: "assistant",
           content: aiResponse,
         });
 
-        // Best-effort auto title generation from conversation key points.
+        // 7. 대화 제목 자동 갱신 (best-effort)
         try {
           await maybeAutoUpdateConversationTitle(ctx.user.id, input.conversationId);
         } catch (error) {
@@ -365,14 +464,24 @@ export const appRouter = router({
           await createMessage({ conversationId: convId, role: "user", content: firstUserContent });
         }
 
-        // 5. LLM 컨텍스트 구성
-        const history = await getMessagesByConversationId(convId);
-        const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-          ...history.map(m => ({
-            role: m.role as "system" | "user" | "assistant",
-            content: m.content,
-          })),
-        ];
+        // 5. LLM 컨텍스트 구성 (내부 문서 포함)
+        const [history, files] = await Promise.all([
+          getMessagesByConversationId(convId),
+          getAllInternalFiles().catch(() => []),
+        ]);
+        const fileContext = buildFileContext(files);
+
+        // 파일 컨텍스트를 system 메시지에 추가
+        const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> =
+          history.map(m => {
+            if (m.role === "system" && fileContext) {
+              return {
+                role: "system" as const,
+                content: `${m.content}\n\n## 📁 내부 지식 문서 (추가 참고)\n\n${fileContext}`,
+              };
+            }
+            return { role: m.role as "system" | "user" | "assistant", content: m.content };
+          });
 
         // 입학 모드: 히스토리에 없는 시작 유도 메시지 임시 추가
         if (!isNotice) {
