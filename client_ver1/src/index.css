@@ -1,5 +1,3 @@
-/* 26.04.06 수정: 전체 폰트 Pretendard로 변경, @import 순서 조정 (PostCSS 경고 해결) */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -45,7 +43,6 @@
 }
 
 :root {
-  --spacing: 0.25rem;
   --primary: oklch(0.52 0.17 245);
   --primary-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.52 0.17 245);
@@ -119,10 +116,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

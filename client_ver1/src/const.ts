@@ -1,5 +1,4 @@
-export const COOKIE_NAME = "app_session_id";
-export const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
+export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 /**
  * 환경 변수(VITE_OAUTH_PORTAL_URL)에 의존하지 않고, 

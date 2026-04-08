@@ -1,4 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Streamdown } from "streamdown";
 import {
@@ -13,6 +15,7 @@ import {
   LogOut,
   Phone,
   Search,
+  Send,
   Settings,
   SquarePen,
   ThumbsDown,
@@ -82,74 +85,78 @@ function WelcomeView({
     <div className="flex flex-col h-full">
       {/* Upper centered content */}
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden px-6">
-
-        
+        {/* HSU Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span
+            className="font-black text-gray-100"
+            style={{ fontSize: "clamp(80px, 18vw, 200px)", letterSpacing: "-0.02em" }}
+          >
+            HSU
+          </span>
+        </div>
 
         {/* Main content */}
-        {/* 26.04.06 수정: 로고 이미지 추가, h1/서브타이틀 폰트·색상 지정, gap 직접 지정 */}
-        <div className="relative z-10 flex flex-col items-center text-center" style={{ gap: 0 }}>
-          <img src="/logo.png" alt="logo" style={{ marginBottom: 30 }} />
-          <h1 style={{ fontSize: 30, fontWeight: 800, fontFamily: 'Pretendard', letterSpacing: '-0.02em' }}>
+        <div className="relative z-10 flex flex-col items-center text-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">
             <span style={{ color: HANSUNG_NAVY }}>한성대학교</span>{" "}
             <span style={{ color: HANSUNG_SKY }}>AI 도우미</span>
           </h1>
-          <p style={{ marginTop: -2, fontSize: 26, fontWeight: 500, fontFamily: 'Pretendard', color: '#000000' }}>안녕하세요, 무엇을 도와드릴까요?</p>
+          <p className="text-gray-500 text-base">안녕하세요, 무엇을 도와드릴까요?</p>
 
           {/* Feature Cards */}
           <div className="grid grid-cols-2 gap-4 mt-5 w-full max-w-xl">
-            {/* 26.04.06 수정: 카드 디자인 변경 - 회색 배경 + 흰색 내용 박스 */}
             {/* 공지사항 card */}
             <button
               onClick={onNoticeClick}
               disabled={isModeLoading}
-              className="p-4 text-left transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#EEF2F7", borderRadius: 12 }}
+              className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: HANSUNG_SKY }}
                 >
-                  {isModeLoading ? <Loader2 size={14} className="text-white animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="-2 -3 28 28"><path fill="#fff" d="M12.04 2.5L9.53 5h5zM4 7v13h16V7zm8-7l5 5h3a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3zM7 18v-4h5v4zm7-1v-7h4v7zm-8-5V9h5v3z"/></svg>}
+                  {isModeLoading ? <Loader2 size={13} className="text-white animate-spin" /> : <Building2 size={13} className="text-white" />}
                 </div>
-                <span className="font-bold flex items-center gap-0.5" style={{ color: HANSUNG_NAVY, fontSize: 17 }}>
-                  공지사항 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                <span
+                  className="font-semibold text-sm flex items-center gap-0.5"
+                  style={{ color: HANSUNG_NAVY }}
+                >
+                  공지사항 <ChevronRight size={14} />
                 </span>
               </div>
-              <div className="bg-white px-3 py-2.5" style={{ borderRadius: 4 }}>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  복잡하고 보기 어려운 공지사항을,
-                  <br />
-                  원하는 정보만 물어보면 바로 확인할 수 있어요.
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                복잡하고 보기 어려운 공지사항을,
+                <br />
+                원하는 정보만 물어보면 바로 확인할 수 있어요.
+              </p>
             </button>
 
             {/* 입학 안내 card */}
             <button
               onClick={onAdmissionClick}
               disabled={isModeLoading}
-              className="p-4 text-left transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#EEF2F7", borderRadius: 12 }}
+              className="bg-white rounded-2xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: HANSUNG_SKY }}
                 >
-                  {isModeLoading ? <Loader2 size={14} className="text-white animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="-2 -2 28 28"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 20v-9l-4 1.125V20zm0 0h8m-8 0V6.667M16 20v-9l4 1.125V20zm0 0V6.667M18 8l-6-4l-6 4m5 1h2m-2 3h2"/></svg>}
+                  {isModeLoading ? <Loader2 size={13} className="text-white animate-spin" /> : <GraduationCap size={13} className="text-white" />}
                 </div>
-                <span className="font-bold flex items-center gap-0.5" style={{ color: HANSUNG_NAVY, fontSize: 17 }}>
-                  입학 안내 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                <span
+                  className="font-semibold text-sm flex items-center gap-0.5"
+                  style={{ color: HANSUNG_NAVY }}
+                >
+                  입학 안내 <ChevronRight size={14} />
                 </span>
               </div>
-              <div className="bg-white px-3 py-2.5" style={{ borderRadius: 4 }}>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  신입생 입학에 필요한 모든 절차와 경쟁률,
-                  <br />
-                  주요 일정까지 한 번에 손쉽게 안내해 드립니다.
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                신입생 입학에 필요한 모든 절차와 경쟁률,
+                <br />
+                주요 일정까지 한 번에 손쉽게 안내해 드립니다.
+              </p>
             </button>
           </div>
         </div>
@@ -188,18 +195,17 @@ function WelcomeView({
             rows={3}
             className="w-full px-5 pt-4 pb-12 text-sm text-gray-800 placeholder-gray-400 resize-none outline-none bg-transparent"
           />
-          {/* 26.04.06 수정: 전송 버튼 SVG 아이콘 교체, 배경색 #333333 */}
           <div className="absolute bottom-3 right-3">
             <button
               onClick={() => onSendMessage()}
               disabled={!messageInput.trim() || isLoading}
-              className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors"
-              style={{ backgroundColor: '#333333' }}
+              className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors disabled:bg-gray-200"
+              style={{ backgroundColor: messageInput.trim() && !isLoading ? HANSUNG_NAVY : undefined }}
             >
               {isLoading ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m5 12l-.604-5.437C4.223 5.007 5.825 3.864 7.24 4.535l11.944 5.658c1.525.722 1.525 2.892 0 3.614L7.24 19.466c-1.415.67-3.017-.472-2.844-2.028zm0 0h7"/></svg>
+                <Send size={15} />
               )}
             </button>
           </div>
@@ -338,8 +344,8 @@ function ChatView({
   messageInput: string;
   setMessageInput: (v: string) => void;
   onSend: (content?: string) => void;
-  messagesEndRef: React.RefObject<HTMLDivElement | null>;
-  messagesContainerRef: React.RefObject<HTMLDivElement | null>;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesContainerRef: React.RefObject<HTMLDivElement>;
   onScroll: () => void;
   showScrollDown: boolean;
   scrollToBottom: () => void;
@@ -393,7 +399,7 @@ function ChatView({
               if (msg.role === "user") {
                 return (
                   <div key={msg.id} className="flex justify-end">
-                    <div className="bg-gray-800 text-white text-sm px-4 py-3 rounded-lg max-w-[70%] whitespace-pre-wrap leading-relaxed">
+                    <div className="bg-gray-800 text-white text-sm px-4 py-3 rounded-2xl max-w-[70%] whitespace-pre-wrap leading-relaxed">
                       {msg.content}
                     </div>
                   </div>
@@ -403,9 +409,9 @@ function ChatView({
               return (
                 <div key={msg.id} className="flex flex-col gap-1">
                   <div className="flex items-start gap-3">
-                    {/* 26.04.06 수정: AI 프로필 이미지 bugi_obj.png로 변경 */}
+                    {/* AI Avatar */}
                     <img
-                      src="/bugi_obj.png"
+                      src="/ai_profile.jpg"
                       alt="HANSUNG AI"
                       className="w-9 h-9 rounded-full object-cover flex-shrink-0 mt-0.5"
                     />
@@ -414,7 +420,7 @@ function ChatView({
                       <p className="text-xs font-semibold text-gray-500 mb-1.5">
                         HANSUNG AI 도우미
                       </p>
-                      <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm inline-block max-w-[85%]">
+                      <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm inline-block max-w-[85%]">
                         <div className="text-sm text-gray-800 leading-relaxed">
                           <Streamdown>{msg.content}</Streamdown>
                         </div>
@@ -428,7 +434,7 @@ function ChatView({
                   {/* Feedback bar – shown after last AI message */}
                   {isLastAi && (
                     <div className="ml-12 mt-1">
-                      <div className="inline-flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2.5 shadow-sm">
+                      <div className="inline-flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
                         <div>
                           <p className="text-sm font-medium text-gray-700">
                             답변이 도움 되셨나요?
@@ -476,9 +482,8 @@ function ChatView({
             {/* Loading indicator */}
             {sendingMessage && (
               <div className="flex items-start gap-3">
-                {/* 26.04.06 수정: 로딩 말풍선 AI 프로필 이미지 bugi_obj.png로 변경 */}
                 <img
-                  src="/bugi_obj.png"
+                  src="/ai_profile.jpg"
                   alt="HANSUNG AI"
                   className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                 />
@@ -486,9 +491,8 @@ function ChatView({
                   <p className="text-xs font-semibold text-gray-500 mb-1.5">
                     HANSUNG AI 도우미
                   </p>
-                  {/* 26.04.06 수정: 로딩 말풍선 배경 #E5F3FF, 패딩 상하20/좌우30, loading01.gif 크기 80px */}
-                  <div className="rounded-lg shadow-sm" style={{ backgroundColor: "#E5F3FF", paddingTop: 20, paddingBottom: 20, paddingLeft: 30, paddingRight: 30 }}>
-                    <img src="/loading01.gif" alt="loading" style={{ width: 80, objectFit: "contain" }} />
+                  <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                    <Loader2 size={16} className="animate-spin text-gray-400" />
                   </div>
                 </div>
               </div>
@@ -526,7 +530,7 @@ function ChatView({
               <button
                 onClick={() => onSend()}
                 disabled={!messageInput.trim() || sendingMessage}
-                className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors"
+                className="w-9 h-9 text-white rounded-full flex items-center justify-center transition-colors disabled:bg-gray-200"
                 style={{
                   backgroundColor:
                     messageInput.trim() && !sendingMessage ? HANSUNG_NAVY : undefined,
@@ -535,7 +539,7 @@ function ChatView({
                 {sendingMessage ? (
                   <Loader2 size={15} className="animate-spin" />
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m5 12l-.604-5.437C4.223 5.007 5.825 3.864 7.24 4.535l11.944 5.658c1.525.722 1.525 2.892 0 3.614L7.24 19.466c-1.415.67-3.017-.472-2.844-2.028zm0 0h7"/></svg>
+                  <Send size={15} />
                 )}
               </button>
             </div>
@@ -552,7 +556,7 @@ function ChatView({
 // ─── Main Chat Component ──────────────────────────────────────────────────────
 
 export default function Chat() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
   const [, navigate] = useLocation();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -562,6 +566,7 @@ export default function Chat() {
 
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
+  const pendingMessageRef = useRef<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [feedbackState, setFeedbackState] = useState<
@@ -574,20 +579,83 @@ export default function Chat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const utils = trpc.useUtils();
   const trimmedSearch = searchQuery.trim();
 
-  // 26.04.06 수정: 백엔드 없는 디자인 프리뷰용 mock state (tRPC 대체)
-  const [mockConversations, setMockConversations] = useState<{ id: number; title: string; updatedAt: Date }[]>([]);
-  const [mockMessages, setMockMessages] = useState<Record<number, ConvMessage[]>>({});
-  const [isMutating, setIsMutating] = useState(false);
-  const nextIdRef = useRef(1);
+  useEffect(() => {
+    if (!loading && !user) navigate("/login");
+  }, [user, loading, navigate]);
 
-  const conversations = trimmedSearch
-    ? mockConversations.filter(c => c.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
-    : mockConversations;
-  const conversationsLoading = false;
-  const messages: ConvMessage[] = selectedConversationId ? (mockMessages[selectedConversationId] ?? []) : [];
-  const messagesLoading = false;
+  const { data: conversations = [], isLoading: conversationsLoading } =
+    trpc.chat.getConversations.useQuery(undefined, { enabled: !!user });
+
+  const { data: searchedConversations = [] } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedSearch },
+      { enabled: !!user && trimmedSearch.length > 0 }
+    );
+
+  const trimmedModalSearch = modalSearchQuery.trim();
+  const { data: modalSearchedConversations = [] } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedModalSearch },
+      { enabled: !!user && trimmedModalSearch.length > 0 }
+    );
+
+  const { data: messages = [], isLoading: messagesLoading } =
+    trpc.chat.getMessages.useQuery(
+      { conversationId: selectedConversationId! },
+      { enabled: !!user && selectedConversationId !== null }
+    );
+
+  const createConversation = trpc.chat.createConversation.useMutation({
+    onSuccess: (data) => {
+      utils.chat.getConversations.invalidate();
+      setSelectedConversationId(data.id);
+      const msg = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      if (msg) {
+        sendMessage.mutate({ conversationId: data.id, content: msg });
+      }
+    },
+    onError: () => {
+      toast.error("대화 생성에 실패했습니다");
+      setView("welcome");
+      setOptimisticMessages([]);
+    },
+  });
+
+  const startModeConversation = trpc.chat.startModeConversation.useMutation({
+    onSuccess: (data) => {
+      utils.chat.getConversations.invalidate();
+      setSelectedConversationId(data.conversationId);
+      setView("chat");
+      setActiveNav("");
+      setOptimisticMessages([]);
+    },
+    onError: () => toast.error("대화를 시작하지 못했습니다. 잠시 후 다시 시도해주세요."),
+  });
+
+  const deleteConversation = trpc.chat.deleteConversation.useMutation({
+    onSuccess: () => {
+      utils.chat.getConversations.invalidate();
+      toast.success("대화가 삭제되었습니다");
+    },
+    onError: () => toast.error("대화 삭제에 실패했습니다"),
+  });
+
+  const sendMessage = trpc.chat.sendMessage.useMutation({
+    onSuccess: () => {
+      utils.chat.getMessages.invalidate();
+      utils.chat.getConversations.invalidate();
+      setOptimisticMessages([]);
+    },
+    onError: () => {
+      toast.error("메시지 전송에 실패했습니다");
+      setOptimisticMessages([]);
+    },
+  });
+
   useEffect(() => {
     if (view === "chat") {
       const t = setTimeout(() => {
@@ -625,8 +693,7 @@ export default function Chat() {
 
   const handleDeleteConversation = (id: number) => {
     if (confirm("이 대화를 삭제하시겠습니까?")) {
-      setMockConversations(prev => prev.filter(c => c.id !== id));
-      setMockMessages(prev => { const next = { ...prev }; delete next[id]; return next; });
+      deleteConversation.mutate({ conversationId: id });
       if (selectedConversationId === id) {
         setSelectedConversationId(null);
         setView("welcome");
@@ -640,27 +707,23 @@ export default function Chat() {
     if (!msg) return;
     setMessageInput("");
 
-    const userMsg: ConvMessage = { id: `temp-${Date.now()}`, role: "user", content: msg, createdAt: new Date() };
-    setOptimisticMessages([{ id: String(userMsg.id), role: "user", content: msg, createdAt: new Date() }]);
+    setOptimisticMessages([
+      {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: msg,
+        createdAt: new Date(),
+      },
+    ]);
     setView("chat");
     setActiveNav("");
 
-    let convId = selectedConversationId;
-    if (!convId) {
-      convId = nextIdRef.current++;
-      setMockConversations(prev => [{ id: convId!, title: msg.slice(0, 50) || "새 대화", updatedAt: new Date() }, ...prev]);
-      setSelectedConversationId(convId);
+    if (!selectedConversationId) {
+      pendingMessageRef.current = msg;
+      createConversation.mutate({ title: msg.slice(0, 50) || "새 대화" });
+    } else {
+      sendMessage.mutate({ conversationId: selectedConversationId, content: msg });
     }
-
-    const cid = convId;
-    setIsMutating(true);
-    // 26.04.06 수정: 로딩 GIF 유지 시간 7초로 설정
-    setTimeout(() => {
-      const aiMsg: ConvMessage = { id: Date.now(), role: "assistant", content: "안녕하세요! 디자인 미리보기 모드입니다. 실제 AI 응답은 백엔드 연결 후 사용 가능합니다.", createdAt: new Date() };
-      setMockMessages(prev => ({ ...prev, [cid]: [...(prev[cid] ?? []), { ...userMsg, id: Date.now() - 1 }, aiMsg] }));
-      setOptimisticMessages([]);
-      setIsMutating(false);
-    }, 7000);
   };
 
   const handleScroll = () => {
@@ -674,18 +737,29 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const filteredConversations = conversations;
+  const filteredConversations = trimmedSearch
+    ? Array.from(
+        new Map(
+          [
+            ...conversations.filter((c) =>
+              c.title.toLowerCase().includes(trimmedSearch.toLowerCase())
+            ),
+            ...searchedConversations,
+          ].map((c) => [c.id, c])
+        ).values()
+      )
+    : conversations;
 
   const allMessages: ConvMessage[] = [
     ...(messages as ConvMessage[]),
     ...optimisticMessages,
   ];
 
-  const isLoading = isMutating;
+  const isLoading = createConversation.isPending || sendMessage.isPending;
 
   // ── User helpers ──
 
-  const userDisplayName = user.username || "사용자";
+  const userDisplayName = user.name || user.username || "사용자";
   const userInitials = userDisplayName
     .split(" ")
     .map((w: string) => w.charAt(0))
@@ -696,13 +770,11 @@ export default function Chat() {
 
   // ── Sidebar nav items ──
 
-  // 26.04.06 수정: 전체 nav 아이콘 이미지로 교체 (2배수 이미지, 17px로 1배수 표시)
   const navItems = [
     { label: "새 채팅", Icon: SquarePen, action: handleNewChat },
     {
       label: "검색",
       Icon: Search,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#fff" fill-rule="evenodd" d="M8 4a4 4 0 1 0 0 8a4 4 0 0 0 0-8M2 8a6 6 0 1 1 10.89 3.476l4.817 4.817a1 1 0 0 1-1.414 1.414l-4.816-4.816A6 6 0 0 1 2 8" clip-rule="evenodd"/></svg>,
       action: () => {
         setModalSearchQuery("");
         setShowSearchModal(true);
@@ -711,7 +783,6 @@ export default function Chat() {
     {
       label: "이전 기록",
       Icon: Clock,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="#fff" d="M13.26 3C8.17 2.86 4 6.95 4 12H2.21c-.45 0-.67.54-.35.85l2.79 2.8c.2.2.51.2.71 0l2.79-2.8a.5.5 0 0 0-.36-.85H6c0-3.9 3.18-7.05 7.1-7c3.72.05 6.85 3.18 6.9 6.9c.05 3.91-3.1 7.1-7 7.1c-1.61 0-3.1-.55-4.28-1.48a.994.994 0 0 0-1.32.08c-.42.42-.39 1.13.08 1.49A8.86 8.86 0 0 0 13 21c5.05 0 9.14-4.17 9-9.26c-.13-4.69-4.05-8.61-8.74-8.74m-.51 5c-.41 0-.75.34-.75.75v3.68c0 .35.19.68.49.86l3.12 1.85c.36.21.82.09 1.03-.26c.21-.36.09-.82-.26-1.03l-2.88-1.71v-3.4c0-.4-.34-.74-.75-.74"/></svg>,
       action: () => {
         setView("history");
         setActiveNav("이전 기록");
@@ -720,22 +791,14 @@ export default function Chat() {
     {
       label: "공지사항 바로가기",
       Icon: Building2,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24"><path fill="#fff" d="M12.04 2.5L9.53 5h5zM4 7v13h16V7zm8-7l5 5h3a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3zM7 18v-4h5v4zm7-1v-7h4v7zm-8-5V9h5v3z"/></svg>,
       action: () => window.open("https://www.hansung.ac.kr/hansung/6172/subview.do", "_blank"),
     },
     {
       label: "입학안내 바로가기",
       Icon: GraduationCap,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 20v-9l-4 1.125V20zm0 0h8m-8 0V6.667M16 20v-9l4 1.125V20zm0 0V6.667M18 8l-6-4l-6 4m5 1h2m-2 3h2"/></svg>,
-      action: () => setShowArsModal(true),
+      action: () => window.open("https://enter.hansung.ac.kr/?m1=home", "_blank"),
     },
-    {
-
-      label: "ARS안내",
-      Icon: Phone,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2m10 3a2 2 0 0 1 2 2m-2-6a6 6 0 0 1 6 6"/></svg>,
-      action: () => setShowArsModal(true),
-    },
+    { label: "ARS안내", Icon: Phone, action: () => setShowArsModal(true) },
   ];
 
   // ── Render ──
@@ -744,14 +807,14 @@ export default function Chat() {
     <div className="flex h-screen overflow-hidden bg-white">
       {/* ── Sidebar ── */}
       <aside
-        className="flex flex-col flex-shrink-0 overflow-hidden transition-all duration-270"
+        className="flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200"
         style={{
-          width: sidebarCollapsed ? 60 : 270,
+          width: sidebarCollapsed ? 60 : 200,
           backgroundColor: HANSUNG_NAVY,
         }}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 px-3 flex-shrink-0" style={{ height: 60 }}>
+        <div className="flex items-center gap-3 px-3 flex-shrink-0" style={{ height: 60 }}>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
@@ -766,17 +829,16 @@ export default function Chat() {
           >
             <AlignJustify size={20} />
           </button>
-          {/* 26.04.06 수정: HANSUNG #ffffff, AI 도우미 #4899FF 색상 분리 */}
           {!sidebarCollapsed && (
-            <span className="font-bold text-[16px] whitespace-nowrap overflow-hidden" style={{ display: 'flex', alignItems: 'center', gap: 'calc(var(--spacing) * 1)' }}>
-              <span style={{ color: '#ffffff' }}>HANSUNG</span><span style={{ color: '#4899FF' }}>AI 도우미</span>
+            <span className="text-white font-bold text-[13px] whitespace-nowrap overflow-hidden">
+              HANSUNG AI 도우미
             </span>
           )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ label, Icon, svgIcon, action }) => {
+          {navItems.map(({ label, Icon, action }) => {
             const isActive = activeNav === label;
             return (
               <button
@@ -786,7 +848,7 @@ export default function Chat() {
                   action();
                 }}
                 title={sidebarCollapsed ? label : undefined}
-                className="w-full flex items-center gap-3 text-white text-[15px] transition-colors" /* 26.04.06 수정: 메뉴 글자 크기 15px */
+                className="w-full flex items-center gap-3 text-white text-[13px] transition-colors"
                 style={{
                   padding: sidebarCollapsed ? "10px 8px" : "10px 12px",
                   borderRadius: sidebarCollapsed ? 10 : 9999,
@@ -803,11 +865,7 @@ export default function Chat() {
                     (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
                 }}
               >
-                {/* 26.04.06 수정: svgIcon > lucide Icon 순으로 렌더링 */}
-                {svgIcon
-                  ? <span className="flex-shrink-0">{svgIcon}</span>
-                  : <Icon size={17} className="flex-shrink-0" />
-                }
+                <Icon size={17} className="flex-shrink-0" />
                 {!sidebarCollapsed && (
                   <span className="truncate text-left whitespace-nowrap">{label}</span>
                 )}
@@ -876,10 +934,9 @@ export default function Chat() {
                       setShowUserMenu(false);
                       logout();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left"
-                    style={{ color: '#111111' }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
                   >
-                    <LogOut size={15} style={{ color: '#111111' }} className="flex-shrink-0" />
+                    <LogOut size={15} className="flex-shrink-0" />
                     로그아웃
                   </button>
                 </div>
@@ -975,7 +1032,7 @@ export default function Chat() {
                   ...conversations.filter((c) =>
                     c.title.toLowerCase().includes(trimmed.toLowerCase())
                   ),
-                  ...conversations.filter(c => c.title.toLowerCase().includes(trimmed.toLowerCase())),
+                  ...modalSearchedConversations,
                 ].map((c) => [c.id, c])
               ).values()
             )
@@ -1082,16 +1139,15 @@ export default function Chat() {
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <div className="flex justify-end items-center flex-shrink-0 gap-2 px-4" style={{ height: 56 }}>
-          {/* 26.04.06 수정: 로그아웃 버튼 배경색 #111111 */}
           <button
             onClick={() => logout()}
             className="text-white text-sm font-medium rounded-full px-4 py-1.5 transition-colors"
-            style={{ backgroundColor: '#111111' }}
+            style={{ backgroundColor: HANSUNG_NAVY }}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#333333")
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#162b5e")
             }
             onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = '#111111')
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = HANSUNG_NAVY)
             }
           >
             로그아웃
@@ -1112,9 +1168,9 @@ export default function Chat() {
               messageInput={messageInput}
               setMessageInput={setMessageInput}
               isLoading={isLoading}
-              onNoticeClick={() => handleSendMessage("공지사항 안내해주세요")}
-              onAdmissionClick={() => handleSendMessage("입학 안내해주세요")}
-              isModeLoading={false}
+              onNoticeClick={() => startModeConversation.mutate({ mode: "notice" })}
+              onAdmissionClick={() => startModeConversation.mutate({ mode: "admission" })}
+              isModeLoading={startModeConversation.isPending}
             />
           )}
 
