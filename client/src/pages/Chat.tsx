@@ -1,4 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Streamdown } from "streamdown";
 import {
@@ -13,6 +15,7 @@ import {
   LogOut,
   Phone,
   Search,
+  Send,
   Settings,
   SquarePen,
   ThumbsDown,
@@ -552,7 +555,7 @@ function ChatView({
 // ─── Main Chat Component ──────────────────────────────────────────────────────
 
 export default function Chat() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
   const [, navigate] = useLocation();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -562,6 +565,7 @@ export default function Chat() {
 
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
+  const pendingMessageRef = useRef<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [feedbackState, setFeedbackState] = useState<
@@ -574,20 +578,83 @@ export default function Chat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const utils = trpc.useUtils();
   const trimmedSearch = searchQuery.trim();
 
-  // 26.04.06 수정: 백엔드 없는 디자인 프리뷰용 mock state (tRPC 대체)
-  const [mockConversations, setMockConversations] = useState<{ id: number; title: string; updatedAt: Date }[]>([]);
-  const [mockMessages, setMockMessages] = useState<Record<number, ConvMessage[]>>({});
-  const [isMutating, setIsMutating] = useState(false);
-  const nextIdRef = useRef(1);
+  useEffect(() => {
+    if (!loading && !user) navigate("/login");
+  }, [user, loading, navigate]);
 
-  const conversations = trimmedSearch
-    ? mockConversations.filter(c => c.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
-    : mockConversations;
-  const conversationsLoading = false;
-  const messages: ConvMessage[] = selectedConversationId ? (mockMessages[selectedConversationId] ?? []) : [];
-  const messagesLoading = false;
+  const { data: conversations = [], isLoading: conversationsLoading } =
+    trpc.chat.getConversations.useQuery(undefined, { enabled: !!user });
+
+  const { data: searchedConversations = [] } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedSearch },
+      { enabled: !!user && trimmedSearch.length > 0 }
+    );
+
+  const trimmedModalSearch = modalSearchQuery.trim();
+  const { data: modalSearchedConversations = [] } =
+    trpc.chat.searchConversations.useQuery(
+      { query: trimmedModalSearch },
+      { enabled: !!user && trimmedModalSearch.length > 0 }
+    );
+
+  const { data: messages = [], isLoading: messagesLoading } =
+    trpc.chat.getMessages.useQuery(
+      { conversationId: selectedConversationId! },
+      { enabled: !!user && selectedConversationId !== null }
+    );
+
+  const createConversation = trpc.chat.createConversation.useMutation({
+    onSuccess: (data) => {
+      utils.chat.getConversations.invalidate();
+      setSelectedConversationId(data.id);
+      const msg = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      if (msg) {
+        sendMessage.mutate({ conversationId: data.id, content: msg });
+      }
+    },
+    onError: () => {
+      toast.error("대화 생성에 실패했습니다");
+      setView("welcome");
+      setOptimisticMessages([]);
+    },
+  });
+
+  const startModeConversation = trpc.chat.startModeConversation.useMutation({
+    onSuccess: (data) => {
+      utils.chat.getConversations.invalidate();
+      setSelectedConversationId(data.conversationId);
+      setView("chat");
+      setActiveNav("");
+      setOptimisticMessages([]);
+    },
+    onError: () => toast.error("대화를 시작하지 못했습니다. 잠시 후 다시 시도해주세요."),
+  });
+
+  const deleteConversation = trpc.chat.deleteConversation.useMutation({
+    onSuccess: () => {
+      utils.chat.getConversations.invalidate();
+      toast.success("대화가 삭제되었습니다");
+    },
+    onError: () => toast.error("대화 삭제에 실패했습니다"),
+  });
+
+  const sendMessage = trpc.chat.sendMessage.useMutation({
+    onSuccess: () => {
+      utils.chat.getMessages.invalidate();
+      utils.chat.getConversations.invalidate();
+      setOptimisticMessages([]);
+    },
+    onError: () => {
+      toast.error("메시지 전송에 실패했습니다");
+      setOptimisticMessages([]);
+    },
+  });
+
   useEffect(() => {
     if (view === "chat") {
       const t = setTimeout(() => {
@@ -625,8 +692,7 @@ export default function Chat() {
 
   const handleDeleteConversation = (id: number) => {
     if (confirm("이 대화를 삭제하시겠습니까?")) {
-      setMockConversations(prev => prev.filter(c => c.id !== id));
-      setMockMessages(prev => { const next = { ...prev }; delete next[id]; return next; });
+      deleteConversation.mutate({ conversationId: id });
       if (selectedConversationId === id) {
         setSelectedConversationId(null);
         setView("welcome");
@@ -640,27 +706,23 @@ export default function Chat() {
     if (!msg) return;
     setMessageInput("");
 
-    const userMsg: ConvMessage = { id: `temp-${Date.now()}`, role: "user", content: msg, createdAt: new Date() };
-    setOptimisticMessages([{ id: String(userMsg.id), role: "user", content: msg, createdAt: new Date() }]);
+    setOptimisticMessages([
+      {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: msg,
+        createdAt: new Date(),
+      },
+    ]);
     setView("chat");
     setActiveNav("");
 
-    let convId = selectedConversationId;
-    if (!convId) {
-      convId = nextIdRef.current++;
-      setMockConversations(prev => [{ id: convId!, title: msg.slice(0, 50) || "새 대화", updatedAt: new Date() }, ...prev]);
-      setSelectedConversationId(convId);
+    if (!selectedConversationId) {
+      pendingMessageRef.current = msg;
+      createConversation.mutate({ title: msg.slice(0, 50) || "새 대화" });
+    } else {
+      sendMessage.mutate({ conversationId: selectedConversationId, content: msg });
     }
-
-    const cid = convId;
-    setIsMutating(true);
-    // 26.04.06 수정: 로딩 GIF 유지 시간 7초로 설정
-    setTimeout(() => {
-      const aiMsg: ConvMessage = { id: Date.now(), role: "assistant", content: "안녕하세요! 디자인 미리보기 모드입니다. 실제 AI 응답은 백엔드 연결 후 사용 가능합니다.", createdAt: new Date() };
-      setMockMessages(prev => ({ ...prev, [cid]: [...(prev[cid] ?? []), { ...userMsg, id: Date.now() - 1 }, aiMsg] }));
-      setOptimisticMessages([]);
-      setIsMutating(false);
-    }, 7000);
   };
 
   const handleScroll = () => {
@@ -674,18 +736,29 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const filteredConversations = conversations;
+  const filteredConversations = trimmedSearch
+    ? Array.from(
+        new Map(
+          [
+            ...conversations.filter((c) =>
+              c.title.toLowerCase().includes(trimmedSearch.toLowerCase())
+            ),
+            ...searchedConversations,
+          ].map((c) => [c.id, c])
+        ).values()
+      )
+    : conversations;
 
   const allMessages: ConvMessage[] = [
     ...(messages as ConvMessage[]),
     ...optimisticMessages,
   ];
 
-  const isLoading = isMutating;
+  const isLoading = createConversation.isPending || sendMessage.isPending;
 
   // ── User helpers ──
 
-  const userDisplayName = user.username || "사용자";
+  const userDisplayName = user.name || user.username || "사용자";
   const userInitials = userDisplayName
     .split(" ")
     .map((w: string) => w.charAt(0))
@@ -724,7 +797,6 @@ export default function Chat() {
       action: () => window.open("https://www.hansung.ac.kr/hansung/6172/subview.do", "_blank"),
     },
     {
-      // 26.04.08 수정 : 입학안내 링크 수정
       label: "입학안내 바로가기",
       Icon: GraduationCap,
       svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 20v-9l-4 1.125V20zm0 0h8m-8 0V6.667M16 20v-9l4 1.125V20zm0 0V6.667M18 8l-6-4l-6 4m5 1h2m-2 3h2"/></svg>,
@@ -976,7 +1048,7 @@ export default function Chat() {
                   ...conversations.filter((c) =>
                     c.title.toLowerCase().includes(trimmed.toLowerCase())
                   ),
-                  ...conversations.filter(c => c.title.toLowerCase().includes(trimmed.toLowerCase())),
+                  ...modalSearchedConversations,
                 ].map((c) => [c.id, c])
               ).values()
             )
@@ -1113,9 +1185,9 @@ export default function Chat() {
               messageInput={messageInput}
               setMessageInput={setMessageInput}
               isLoading={isLoading}
-              onNoticeClick={() => handleSendMessage("공지사항 안내해주세요")}
-              onAdmissionClick={() => handleSendMessage("입학 안내해주세요")}
-              isModeLoading={false}
+              onNoticeClick={() => startModeConversation.mutate({ mode: "notice" })}
+              onAdmissionClick={() => startModeConversation.mutate({ mode: "admission" })}
+              isModeLoading={startModeConversation.isPending}
             />
           )}
 
