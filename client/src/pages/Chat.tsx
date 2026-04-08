@@ -15,7 +15,6 @@ import {
   LogOut,
   Phone,
   Search,
-  Send,
   Settings,
   SquarePen,
   ThumbsDown,
@@ -85,8 +84,6 @@ function WelcomeView({
     <div className="flex flex-col h-full">
       {/* Upper centered content */}
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden px-6">
-
-        
 
         {/* Main content */}
         {/* 26.04.06 수정: 로고 이미지 추가, h1/서브타이틀 폰트·색상 지정, gap 직접 지정 */}
@@ -181,6 +178,7 @@ function WelcomeView({
         </div>
 
         {/* Input */}
+        {/* 26.04.06 수정: 전송 버튼 SVG 아이콘 교체, 배경색 #333333 */}
         <div className="max-w-3xl mx-auto relative bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           <textarea
             value={messageInput}
@@ -191,7 +189,6 @@ function WelcomeView({
             rows={3}
             className="w-full px-5 pt-4 pb-12 text-sm text-gray-800 placeholder-gray-400 resize-none outline-none bg-transparent"
           />
-          {/* 26.04.06 수정: 전송 버튼 SVG 아이콘 교체, 배경색 #333333 */}
           <div className="absolute bottom-3 right-3">
             <button
               onClick={() => onSendMessage()}
@@ -341,8 +338,8 @@ function ChatView({
   messageInput: string;
   setMessageInput: (v: string) => void;
   onSend: (content?: string) => void;
-  messagesEndRef: React.RefObject<HTMLDivElement | null>;
-  messagesContainerRef: React.RefObject<HTMLDivElement | null>;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesContainerRef: React.RefObject<HTMLDivElement>;
   onScroll: () => void;
   showScrollDown: boolean;
   scrollToBottom: () => void;
@@ -396,6 +393,7 @@ function ChatView({
               if (msg.role === "user") {
                 return (
                   <div key={msg.id} className="flex justify-end">
+                    {/* 26.04.06 수정: rounded-2xl → rounded-lg */}
                     <div className="bg-gray-800 text-white text-sm px-4 py-3 rounded-lg max-w-[70%] whitespace-pre-wrap leading-relaxed">
                       {msg.content}
                     </div>
@@ -417,6 +415,7 @@ function ChatView({
                       <p className="text-xs font-semibold text-gray-500 mb-1.5">
                         HANSUNG AI 도우미
                       </p>
+                      {/* 26.04.06 수정: rounded-2xl → rounded-lg */}
                       <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm inline-block max-w-[85%]">
                         <div className="text-sm text-gray-800 leading-relaxed">
                           <Streamdown>{msg.content}</Streamdown>
@@ -769,13 +768,13 @@ export default function Chat() {
 
   // ── Sidebar nav items ──
 
-  // 26.04.06 수정: 전체 nav 아이콘 이미지로 교체 (2배수 이미지, 17px로 1배수 표시)
+  // 26.04.06 수정: 사이드바 nav 아이콘 SVG로 교체, 메뉴 글자 크기 15px, 사이드바 width 270px
   const navItems = [
-    { label: "새 채팅", Icon: SquarePen, action: handleNewChat },
+    { label: "새 채팅", Icon: SquarePen, svgIcon: null, action: handleNewChat },
     {
       label: "검색",
       Icon: Search,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#fff" fill-rule="evenodd" d="M8 4a4 4 0 1 0 0 8a4 4 0 0 0 0-8M2 8a6 6 0 1 1 10.89 3.476l4.817 4.817a1 1 0 0 1-1.414 1.414l-4.816-4.816A6 6 0 0 1 2 8" clip-rule="evenodd"/></svg>,
+      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#fff" fillRule="evenodd" d="M8 4a4 4 0 1 0 0 8a4 4 0 0 0 0-8M2 8a6 6 0 1 1 10.89 3.476l4.817 4.817a1 1 0 0 1-1.414 1.414l-4.816-4.816A6 6 0 0 1 2 8" clipRule="evenodd"/></svg>,
       action: () => {
         setModalSearchQuery("");
         setShowSearchModal(true);
@@ -797,13 +796,13 @@ export default function Chat() {
       action: () => window.open("https://www.hansung.ac.kr/hansung/6172/subview.do", "_blank"),
     },
     {
+      // 26.04.08 수정: 입학안내 링크 수정
       label: "입학안내 바로가기",
       Icon: GraduationCap,
-      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 20v-9l-4 1.125V20zm0 0h8m-8 0V6.667M16 20v-9l4 1.125V20zm0 0V6.667M18 8l-6-4l-6 4m5 1h2m-2 3h2"/></svg>,
+      svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" d="M8 20v-9l-4 1.125V20zm0 0h8m-8 0V6.667M16 20v-9l4 1.125V20zm0 0V6.667M18 8l-6-4l-6 4m5 1h2m-2 3h2"/></svg>,
       action: () => window.open("https://enter.hansung.ac.kr/?m1=home", "_blank"),
     },
     {
-
       label: "ARS안내",
       Icon: Phone,
       svgIcon: <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24"><path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2m10 3a2 2 0 0 1 2 2m-2-6a6 6 0 0 1 6 6"/></svg>,
@@ -859,7 +858,7 @@ export default function Chat() {
                   action();
                 }}
                 title={sidebarCollapsed ? label : undefined}
-                className="w-full flex items-center gap-3 text-white text-[15px] transition-colors" /* 26.04.06 수정: 메뉴 글자 크기 15px */
+                className="w-full flex items-center gap-3 text-white text-[15px] transition-colors"
                 style={{
                   padding: sidebarCollapsed ? "10px 8px" : "10px 12px",
                   borderRadius: sidebarCollapsed ? 10 : 9999,
@@ -876,7 +875,7 @@ export default function Chat() {
                     (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
                 }}
               >
-                {/* 26.04.06 수정: svgIcon > lucide Icon 순으로 렌더링 */}
+                {/* 26.04.06 수정: svgIcon 우선, 없으면 lucide Icon */}
                 {svgIcon
                   ? <span className="flex-shrink-0">{svgIcon}</span>
                   : <Icon size={17} className="flex-shrink-0" />
@@ -949,10 +948,9 @@ export default function Chat() {
                       setShowUserMenu(false);
                       logout();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left"
-                    style={{ color: '#111111' }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
                   >
-                    <LogOut size={15} style={{ color: '#111111' }} className="flex-shrink-0" />
+                    <LogOut size={15} className="flex-shrink-0" />
                     로그아웃
                   </button>
                 </div>
