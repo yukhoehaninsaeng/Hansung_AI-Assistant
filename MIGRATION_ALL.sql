@@ -98,4 +98,4 @@ CREATE INDEX IF NOT EXISTS `idx_users_email` ON `users` (`email`);
 -- ('admin', '$2b$10$...', 'Administrator', 'admin@example.com', 'local', 'admin', 'approved', NOW(), NOW(), NOW());
 
 -- 마이그레이션 완료
-SELECT '✓ 모든 테이블이 성공적으로 생성되었습니다.' AS migration_status;
+SELECT '모든 테이블이 성공적으로 생성되었습니다.' AS migration_status;
