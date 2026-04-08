@@ -81,6 +81,8 @@ function WelcomeView({
     }
   };
 
+// 26.04.08 롤백 디자인 통합 전
+
   return (
     <div className="flex flex-col h-full">
       {/* Upper centered content */}
