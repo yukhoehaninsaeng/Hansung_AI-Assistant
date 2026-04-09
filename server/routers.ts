@@ -90,7 +90,6 @@ function buildFileContext(files: Array<{ filename: string; content?: string | nu
 
 async function searchWeb(query: string): Promise<string> {
   try {
-    // 한성대학교 맥락으로 검색
     const searchQuery = `한성대학교 ${query}`;
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
     const text = await Promise.race([
@@ -136,21 +135,17 @@ function buildMessagesWithContext(
   const hasSystemMsg = history.some((m) => m.role === "system");
 
   if (hasSystemMsg) {
-    // 기존 system 메시지에 파일·웹 컨텍스트 추가
     return history.map((m) => {
       if (m.role === "system") {
         return {
           role: "system" as const,
-          content: knowledgeBlock
-            ? `${m.content}\n\n${knowledgeBlock}`
-            : m.content,
+          content: knowledgeBlock ? `${m.content}\n\n${knowledgeBlock}` : m.content,
         };
       }
       return { role: m.role as "user" | "assistant", content: m.content };
     });
   }
 
-  // system 메시지 없으면 새로 추가
   const systemContent = knowledgeBlock
     ? `${baseInstruction}\n\n${knowledgeBlock}`
     : baseInstruction;
@@ -169,31 +164,22 @@ function buildMessagesWithContext(
 function isDefaultConversationTitle(title: string | null | undefined) {
   const value = (title || "").trim().toLowerCase();
   if (!value) return true;
-  return [
-    "new chat",
-    "새 채팅",
-    "새 대화",
-    "chat",
-  ].includes(value);
+  return ["new chat", "새 채팅", "새 대화", "chat"].includes(value);
 }
 
 function sanitizeConversationTitle(raw: string) {
-  const singleLine = raw
+  return raw
     .replace(/[\r\n]+/g, " ")
     .replace(/^["'`[\(\s]+/, "")
     .replace(/["'`\]\)\s]+$/, "")
     .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40)
     .trim();
-
-  return singleLine.slice(0, 40).trim();
 }
 
 function fallbackConversationTitleFromText(text: string) {
-  const normalized = text
-    .replace(/[\r\n]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
+  const normalized = text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
   if (!normalized) return "새 채팅";
   return normalized.slice(0, 30).trim();
 }
@@ -205,14 +191,9 @@ async function maybeAutoUpdateConversationTitle(userId: number, conversationId: 
   const msgs = await getMessagesByConversationId(conversationId);
   if (msgs.length === 0) return;
 
-  // Only auto-title early conversations or conversations still on a generic title.
   if (!isDefaultConversationTitle(conversation.title) && msgs.length > 4) return;
 
-  const importantMessages = msgs
-    .slice(-6)
-    .map((m) => `${m.role}: ${m.content}`)
-    .join("\n");
-
+  const importantMessages = msgs.slice(-6).map((m) => `${m.role}: ${m.content}`).join("\n");
   const firstUserMessage = msgs.find((m) => m.role === "user")?.content ?? "";
   let nextTitle = "";
 
@@ -222,8 +203,7 @@ async function maybeAutoUpdateConversationTitle(userId: number, conversationId: 
       messages: [
         {
           role: "system",
-          content:
-            "Create a short conversation title from the key points. Return only one title, no quotes, no markdown, max 20 characters.",
+          content: "Create a short conversation title from the key points. Return only one title, no quotes, no markdown, max 20 characters.",
         },
         {
           role: "user",
@@ -245,12 +225,8 @@ async function maybeAutoUpdateConversationTitle(userId: number, conversationId: 
     console.warn("[ConversationTitle] LLM title generation failed:", error);
   }
 
-  if (!nextTitle) {
-    nextTitle = fallbackConversationTitleFromText(firstUserMessage);
-  }
-
-  if (!nextTitle) return;
-  if (nextTitle === conversation.title) return;
+  if (!nextTitle) nextTitle = fallbackConversationTitleFromText(firstUserMessage);
+  if (!nextTitle || nextTitle === conversation.title) return;
 
   await updateConversationTitle(conversationId, nextTitle);
 }
@@ -259,7 +235,7 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    
+
     login: publicProcedure
       .input(z.object({
         username: z.string().min(1),
@@ -270,53 +246,47 @@ export const appRouter = router({
         if (!user) {
           throw new TRPCError({ code: "NOT_FOUND", message: "사용자를 찾을 수 없습니다." });
         }
-        
         if (user.status === "pending") {
           throw new TRPCError({ code: "FORBIDDEN", message: "관리자의 승인을 기다리고 있는 계정입니다." });
         }
         if (user.status === "rejected") {
           throw new TRPCError({ code: "FORBIDDEN", message: `가입이 거절되었습니다. 사유: ${user.rejectionReason || "없음"}` });
         }
-        
         const isPasswordValid = await verifyPassword(input.password, user.passwordHash);
         if (!isPasswordValid) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "비밀번호가 일치하지 않습니다." });
         }
-        
         await updateLastSignedIn(user.id);
-        
         const token = await sdk.createSessionToken(user.id, user.username);
-        
         ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
-        
         return { success: true, user };
       }),
 
+    // 26.04.09 회원가입 시 학번, 학과 추가
     register: publicProcedure
       .input(z.object({
         username: z.string().min(1).max(64),
         password: z.string().min(6).max(255),
         name: z.string().optional(),
+        studentId: z.string().min(1, "학번을 입력해주세요"),
+        department: z.string().min(1, "학과를 입력해주세요"),
       }))
       .mutation(async ({ ctx, input }) => {
         const existingUser = await getUserByUsername(input.username);
         if (existingUser) {
           throw new TRPCError({ code: "CONFLICT", message: "이미 존재하는 아이디입니다." });
         }
-
-        const userId = await createLocalUser(input.username, input.password, input.name);
+        const userId = await createLocalUser(
+          input.username,
+          input.password,
+          input.name,
+          input.studentId,
+          input.department,
+        );
         const user = await getUserById(userId);
-
         if (!user) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "사용자 생성에 실패했습니다." });
         }
-
-        // 회원가입 성공 후 자동 로그인을 원할 경우 아래 주석 해제 (단, 승인 절차가 있다면 주석 유지)
-        /*
-        const token = await sdk.createSessionToken(user.id, user.username);
-        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
-        */
-
         return { success: true, user };
       }),
 
@@ -328,7 +298,6 @@ export const appRouter = router({
 
   // 채팅 관련 라우터
   chat: router({
-    // 로그인 없이 사용 가능한 공개 채팅 (대화 기록 저장 없음)
     publicChat: publicProcedure
       .input(z.object({
         messages: z.array(z.object({
@@ -365,10 +334,7 @@ export const appRouter = router({
     createConversation: protectedProcedure
       .input(z.object({ title: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        const id = await createConversation({
-          userId: ctx.user.id,
-          title: input.title,
-        });
+        const id = await createConversation({ userId: ctx.user.id, title: input.title });
         return { id };
       }),
 
@@ -384,41 +350,26 @@ export const appRouter = router({
         content: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
-        // 1. 사용자 메시지 저장
-        await createMessage({
-          conversationId: input.conversationId,
-          role: "user",
-          content: input.content,
-        });
+        await createMessage({ conversationId: input.conversationId, role: "user", content: input.content });
         await updateConversationTimestamp(input.conversationId);
 
-        // 2. 전체 대화 히스토리 로드 (system prompt 포함)
         const history = await getMessagesByConversationId(input.conversationId);
-
-        // 3. 내부 문서 + 웹 검색 병렬 로드
         const [files, webContext] = await Promise.all([
           getAllInternalFiles().catch(() => []),
           searchWeb(input.content),
         ]);
         const fileContext = buildFileContext(files);
-
-        // 4. 파일·웹 컨텍스트를 주입한 메시지 배열 구성
         const llmMessages = buildMessagesWithContext(history, fileContext, webContext);
-
-        // 5. AI 응답 생성
         const llmResult = await invokeLLM({ messages: llmMessages });
         const aiContent = llmResult.choices[0]?.message?.content;
-        const aiResponse =
-          typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
+        const aiResponse = typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
 
-        // 6. AI 메시지 저장
         const messageId = await createMessage({
           conversationId: input.conversationId,
           role: "assistant",
           content: aiResponse,
         });
 
-        // 7. 대화 제목 자동 갱신 (best-effort)
         try {
           await maybeAutoUpdateConversationTitle(ctx.user.id, input.conversationId);
         } catch (error) {
@@ -428,17 +379,13 @@ export const appRouter = router({
         return { id: messageId, content: aiResponse };
       }),
 
-    // 공지사항/입학안내 카드 클릭 시 전용 대화 시작
     startModeConversation: protectedProcedure
       .input(z.object({ mode: z.enum(["notice", "admission"]) }))
       .mutation(async ({ ctx, input }) => {
         const isNotice = input.mode === "notice";
-
-        // 1. 대화 생성
         const title = isNotice ? "공지사항 요약" : "입학 안내 도우미";
         const convId = await createConversation({ userId: ctx.user.id, title });
 
-        // 2. 모드별 시스템 프롬프트 및 웹 크롤링
         let systemContent: string;
         let firstUserContent: string | null = null;
 
@@ -459,12 +406,7 @@ export const appRouter = router({
           systemContent = [
             "당신은 한성대학교 입학처 AI 도우미입니다. 입학에 관한 모든 질문에 친절하고 전문적으로 답변해주세요.",
             "",
-            ...(pageText ? [
-              "=== 입학처 홈페이지 참고 내용 ===",
-              pageText,
-              "================================",
-              "",
-            ] : []),
+            ...(pageText ? ["=== 입학처 홈페이지 참고 내용 ===", pageText, "================================", ""] : []),
             "주요 안내 영역:",
             "- 수시/정시 모집요강 및 지원 방법",
             "- 전형별 안내: 학생부교과전형, 학생부종합전형, 논술전형, 실기/실적전형 등",
@@ -480,22 +422,17 @@ export const appRouter = router({
           ].join("\n");
         }
 
-        // 3. 시스템 메시지 저장 (UI에 미표시)
         await createMessage({ conversationId: convId, role: "system", content: systemContent });
-
-        // 4. 공지사항 모드: 사용자 요청 메시지 저장
         if (firstUserContent) {
           await createMessage({ conversationId: convId, role: "user", content: firstUserContent });
         }
 
-        // 5. LLM 컨텍스트 구성 (내부 문서 포함)
         const [history, files] = await Promise.all([
           getMessagesByConversationId(convId),
           getAllInternalFiles().catch(() => []),
         ]);
         const fileContext = buildFileContext(files);
 
-        // 파일 컨텍스트를 system 메시지에 추가
         const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> =
           history.map(m => {
             if (m.role === "system" && fileContext) {
@@ -507,7 +444,6 @@ export const appRouter = router({
             return { role: m.role as "system" | "user" | "assistant", content: m.content };
           });
 
-        // 입학 모드: 히스토리에 없는 시작 유도 메시지 임시 추가
         if (!isNotice) {
           llmMessages.push({
             role: "user",
@@ -515,12 +451,10 @@ export const appRouter = router({
           });
         }
 
-        // 6. AI 응답 생성
         const llmResult = await invokeLLM({ messages: llmMessages });
         const aiContent = llmResult.choices[0]?.message?.content;
         const aiResponse = typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
 
-        // 7. AI 응답 저장
         await createMessage({ conversationId: convId, role: "assistant", content: aiResponse });
         await updateConversationTimestamp(convId);
 
@@ -565,7 +499,6 @@ export const appRouter = router({
         if (!user) {
           throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
         }
-
         const { passwordHash: _passwordHash, ...safeUser } = user;
         return safeUser;
       }),
@@ -575,25 +508,21 @@ export const appRouter = router({
     }),
 
     createUserGroup: adminProcedure
-      .input(
-        z.object({
-          name: z.string().min(1).max(255),
-          description: z.string().optional(),
-        }),
-      )
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+      }))
       .mutation(async ({ input }) => {
         const id = await createUserGroup(input.name, input.description);
         return { success: true, id };
       }),
 
     updateUserGroup: adminProcedure
-      .input(
-        z.object({
-          groupId: z.number(),
-          name: z.string().min(1).max(255),
-          description: z.string().optional(),
-        }),
-      )
+      .input(z.object({
+        groupId: z.number(),
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+      }))
       .mutation(async ({ input }) => {
         await updateUserGroup(input.groupId, input.name, input.description);
         return { success: true };
@@ -607,24 +536,22 @@ export const appRouter = router({
       }),
 
     updateUser: adminProcedure
-      .input(
-        z.object({
-          userId: z.number(),
-          openId: z.string().nullable().optional(),
-          name: z.string().optional(),
-          username: z.string().optional(),
-          email: z.string().nullable().optional(),
-          loginMethod: z.string().nullable().optional(),
-          role: z.enum(["user", "admin"]).optional(),
-          status: z.enum(["pending", "approved", "rejected"]).optional(),
-          rejectionReason: z.string().nullable().optional(),
-          password: z.string().optional(),
-          groupId: z.number().nullable().optional(),
-          createdAt: z.string().datetime().optional(),
-          updatedAt: z.string().datetime().optional(),
-          lastSignedIn: z.string().datetime().optional(),
-        }),
-      )
+      .input(z.object({
+        userId: z.number(),
+        openId: z.string().nullable().optional(),
+        name: z.string().optional(),
+        username: z.string().optional(),
+        email: z.string().nullable().optional(),
+        loginMethod: z.string().nullable().optional(),
+        role: z.enum(["user", "admin"]).optional(),
+        status: z.enum(["pending", "approved", "rejected"]).optional(),
+        rejectionReason: z.string().nullable().optional(),
+        password: z.string().optional(),
+        groupId: z.number().nullable().optional(),
+        createdAt: z.string().datetime().optional(),
+        updatedAt: z.string().datetime().optional(),
+        lastSignedIn: z.string().datetime().optional(),
+      }))
       .mutation(async ({ input }) => {
         await updateUser(input.userId, {
           openId: input.openId,
@@ -651,8 +578,6 @@ export const appRouter = router({
         if (!user) {
           throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
         }
-
-        // "사용자ID"는 로그인 아이디(username)로 해석하여 초기 비밀번호를 설정
         const temporaryPassword = String(user.username);
         await updateUser(user.id, { password: temporaryPassword });
         return { success: true, temporaryPassword };
@@ -684,13 +609,11 @@ export const appRouter = router({
       }),
 
     upload: adminProcedure
-      .input(
-        z.object({
-          filename: z.string().min(1).max(255),
-          content: z.string().min(1),
-          mimeType: z.string().optional(),
-        }),
-      )
+      .input(z.object({
+        filename: z.string().min(1).max(255),
+        content: z.string().min(1),
+        mimeType: z.string().optional(),
+      }))
       .mutation(async ({ ctx, input }) => {
         const safeName = input.filename.replace(/[\\\/]/g, "_");
         const key = `internal-files/${Date.now()}-${safeName}`;
@@ -707,14 +630,11 @@ export const appRouter = router({
         return { success: true, id: fileId, url: uploaded.url };
       }),
 
-    // 텍스트 직접 입력 저장 (스토리지 불필요, DB에만 저장)
     saveText: adminProcedure
-      .input(
-        z.object({
-          title: z.string().min(1).max(255),
-          content: z.string().min(1),
-        }),
-      )
+      .input(z.object({
+        title: z.string().min(1).max(255),
+        content: z.string().min(1),
+      }))
       .mutation(async ({ ctx, input }) => {
         const fileId = await createInternalFile({
           filename: input.title.endsWith(".txt") ? input.title : `${input.title}.txt`,
@@ -732,6 +652,29 @@ export const appRouter = router({
       .input(z.object({ fileId: z.number() }))
       .mutation(async ({ input }) => {
         await deleteInternalFile(input.fileId);
+        return { success: true };
+      }),
+  }),
+
+  // ── 26.04.09 사용자 프로필 라우터 추가 ──────────────────────────────────
+  user: router({
+    // 내 프로필 조회
+    getMe: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserById(ctx.user.id);
+      if (!user) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "사용자를 찾을 수 없습니다" });
+      }
+      const { passwordHash: _, ...safeUser } = user;
+      return safeUser;
+    }),
+
+    // 이메일 수정
+    updateEmail: protectedProcedure
+      .input(z.object({
+        email: z.string().email("올바른 이메일 형식이 아닙니다"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await updateUser(ctx.user.id, { email: input.email });
         return { success: true };
       }),
   }),

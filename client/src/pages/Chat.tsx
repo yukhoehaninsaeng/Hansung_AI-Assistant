@@ -21,6 +21,9 @@ import {
   ThumbsUp,
   Trash2,
   User,
+  X,        // ★ 추가
+  Pencil,   // ★ 추가
+  Check,    // ★ 추가
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -53,6 +56,166 @@ const SUGGESTED_PROMPTS = [
 
 const HANSUNG_NAVY = "#1e3476";
 const HANSUNG_SKY = "#0098d4";
+
+// ─── ProfileModal ─────────────────────────────────────────────────────────────
+// ★ 추가: 프로필 모달 컴포넌트
+
+function ProfileModal({ onClose }: { onClose: () => void }) {
+  const { data: profile, isLoading, refetch } = trpc.user.getMe.useQuery();
+  const updateEmail = trpc.user.updateEmail.useMutation({
+    onSuccess: () => {
+      toast.success("이메일이 수정되었습니다");
+      setEditingEmail(false);
+      refetch();
+    },
+    onError: () => toast.error("이메일 수정에 실패했습니다"),
+  });
+
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+
+  const handleEditStart = () => {
+    setEmailInput(profile?.email ?? "");
+    setEditingEmail(true);
+  };
+
+  const handleEmailSave = () => {
+    if (!emailInput.trim()) return;
+    updateEmail.mutate({ email: emailInput.trim() });
+  };
+
+  const fields = [
+    { label: "아이디", value: profile?.username, editable: false },
+    { label: "이름", value: profile?.name, editable: false },
+    { label: "학번", value: profile?.studentId, editable: false },
+    { label: "학과", value: profile?.department, editable: false },
+    { label: "역할", value: profile?.role === "admin" ? "관리자" : "학생", editable: false },
+    { label: "이메일", value: profile?.email, editable: true },
+  ];
+
+  const userInitials = (profile?.name || profile?.username || "?")
+    .split(" ")
+    .map((w: string) => w.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div
+          className="relative flex flex-col items-center pt-8 pb-6 px-6"
+          style={{ background: `linear-gradient(135deg, ${HANSUNG_NAVY} 0%, #2a4a9f 100%)` }}
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+            style={{ color: "rgba(255,255,255,0.7)", backgroundColor: "rgba(255,255,255,0.1)" }}
+          >
+            <X size={14} />
+          </button>
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold mb-3 shadow-lg"
+            style={{ backgroundColor: "#f97316" }}
+          >
+            {userInitials}
+          </div>
+          <p className="text-white font-bold text-lg leading-tight">
+            {profile?.name || profile?.username || "-"}
+          </p>
+          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.6)" }}>
+            {profile?.role === "admin" ? "관리자" : "학생"}
+          </p>
+        </div>
+
+        {/* 필드 목록 */}
+        <div className="px-6 py-4 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={24} className="animate-spin text-gray-300" />
+            </div>
+          ) : (
+            fields.map(({ label, value, editable }) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-gray-400 mb-1">{label}</p>
+                {editable && editingEmail ? (
+                  // 이메일 편집 모드
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleEmailSave();
+                        if (e.key === "Escape") setEditingEmail(false);
+                      }}
+                      className="flex-1 text-sm px-3 py-1.5 border rounded-lg outline-none transition-colors"
+                      style={{ borderColor: HANSUNG_SKY }}
+                    />
+                    <button
+                      onClick={handleEmailSave}
+                      disabled={updateEmail.isPending}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                      style={{ backgroundColor: HANSUNG_SKY }}
+                    >
+                      {updateEmail.isPending
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <Check size={12} />
+                      }
+                    </button>
+                    <button
+                      onClick={() => setEditingEmail(false)}
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  // 일반 표시 모드
+                  <div className="flex items-center justify-between group">
+                    <p className="text-sm text-gray-800 font-medium">
+                      {value || <span className="text-gray-400">-</span>}
+                    </p>
+                    {editable && (
+                      <button
+                        onClick={handleEditStart}
+                        className="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}
+                      >
+                        <Pencil size={11} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="h-px bg-gray-100 mt-3" />
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 닫기 버튼 */}
+        <div className="px-6 pb-5">
+          <button
+            onClick={onClose}
+            className="w-full py-2 rounded-xl text-sm font-medium text-white"
+            style={{ backgroundColor: HANSUNG_NAVY }}
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── WelcomeView ─────────────────────────────────────────────────────────────
 
@@ -574,6 +737,7 @@ export default function Chat() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false); // ★ 추가
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -584,6 +748,7 @@ export default function Chat() {
     if (!loading && !user) navigate("/login");
   }, [user, loading, navigate]);
 
+  // trpc 쿼리 및 뮤테이션 정의 - 대화 목록, 검색된 대화, 모달 검색된 대화, 메시지 목록 가져오기
   const { data: conversations = [], isLoading: conversationsLoading } =
     trpc.chat.getConversations.useQuery(undefined, { enabled: !!user });
 
@@ -814,6 +979,12 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white">
+
+      {/* ★ 추가: 프로필 모달 */}
+      {showProfileModal && (
+        <ProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
+
       {/* ── Sidebar ── */}
       <aside
         className="flex flex-col flex-shrink-0 overflow-hidden transition-all duration-270"
@@ -925,8 +1096,12 @@ export default function Chat() {
 
                 {/* Menu items */}
                 <div className="py-1">
+                  {/* ★ 수정: 프로필 클릭 → showProfileModal = true */}
                   <button
-                    onClick={() => setShowUserMenu(false)}
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setShowProfileModal(true);
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                   >
                     <User size={15} className="flex-shrink-0 text-gray-400" />

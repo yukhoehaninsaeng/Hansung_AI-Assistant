@@ -11,6 +11,8 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [studentId, setStudentId] = useState("");      // ★ 추가: 학번 state
+  const [department, setDepartment] = useState("");    // ★ 추가: 학과 state
   const [isLoading, setIsLoading] = useState(false);
   const utils = trpc.useUtils();
 
@@ -43,7 +45,14 @@ export default function Login() {
       if (isLogin) {
         await loginMutation.mutateAsync({ username, password });
       } else {
-        await registerMutation.mutateAsync({ username, password, name });
+        // ★ 수정: studentId, department 추가 전달
+        await registerMutation.mutateAsync({
+          username,
+          password,
+          name,
+          studentId,
+          department,
+        });
       }
     } catch {
       // 에러는 onError에서 처리됨
@@ -57,6 +66,8 @@ export default function Login() {
     setUsername("");
     setPassword("");
     setName("");
+    setStudentId("");    // ★ 추가: 모드 전환 시 초기화
+    setDepartment("");   // ★ 추가: 모드 전환 시 초기화
   };
 
   return (
@@ -91,6 +102,7 @@ export default function Login() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3">
+            {/* 아이디 */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
                 아이디
@@ -106,22 +118,59 @@ export default function Login() {
               />
             </div>
 
+            {/* 회원가입 전용 필드 */}
             {!isLogin && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
-                  이름 (선택)
-                </label>
-                <Input
-                  type="text"
-                  placeholder="이름 입력"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={isLoading}
-                  className="rounded-xl border-gray-200 focus-visible:ring-0 focus-visible:border-[#0098d4] bg-gray-50"
-                />
-              </div>
+              <>
+                {/* 이름 */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
+                    이름 <span className="text-gray-400 font-normal">(선택)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="이름 입력"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isLoading}
+                    className="rounded-xl border-gray-200 focus-visible:ring-0 focus-visible:border-[#0098d4] bg-gray-50"
+                  />
+                </div>
+
+                {/* ★ 추가: 학번 (필수) */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
+                    학번 <span style={{ color: HANSUNG_SKY }}>*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="학번 입력 (예: 20241234)"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    className="rounded-xl border-gray-200 focus-visible:ring-0 focus-visible:border-[#0098d4] bg-gray-50"
+                  />
+                </div>
+
+                {/* ★ 추가: 학과 (필수) */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
+                    학과 <span style={{ color: HANSUNG_SKY }}>*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="학과 입력 (예: 컴퓨터공학과)"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    className="rounded-xl border-gray-200 focus-visible:ring-0 focus-visible:border-[#0098d4] bg-gray-50"
+                  />
+                </div>
+              </>
             )}
 
+            {/* 비밀번호 */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 ml-1">
                 비밀번호
