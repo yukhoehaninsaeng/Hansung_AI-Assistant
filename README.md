@@ -49,26 +49,6 @@
 - **OpenAI API** — GPT 기반 자연어 응답 생성
 - **RAG (Retrieval-Augmented Generation)** — PDF·문서 벡터 검색 후 답변 생성
 
----
-
-## 📁 프로젝트 구조
-
-```
-Hansung_AI-Assistant/
-├── client/                 # React 프론트엔드
-│   ├── src/
-│   │   ├── components/     # UI 컴포넌트
-│   │   ├── pages/          # 페이지 (챗봇, 관리자 등)
-│   │   └── App.jsx
-│   └── package.json
-├── server/                 # Node.js 백엔드
-│   ├── routes/             # API 라우터
-│   ├── services/           # OpenAI, RAG 서비스
-│   ├── data/               # 업로드 문서 저장
-│   └── index.js
-└── README.md
-```
-
 
 ---
 
