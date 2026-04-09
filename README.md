@@ -69,41 +69,6 @@ Hansung_AI-Assistant/
 └── README.md
 ```
 
----
-
-## 🚀 시작하기
-
-### 사전 요구사항
-
-- Node.js 18+
-- OpenAI API Key
-
-### 설치 및 실행
-
-```bash
-# 레포지토리 클론
-git clone https://github.com/yukhoehaninsaeng/Hansung_AI-Assistant.git
-cd Hansung_AI-Assistant
-
-# 백엔드 의존성 설치 및 실행
-cd server
-npm install
-npm start
-
-# 프론트엔드 의존성 설치 및 실행 (새 터미널)
-cd client
-npm install
-npm run dev
-```
-
-### 환경변수 설정
-
-`server/` 디렉토리에 `.env` 파일을 생성하고 아래 내용을 입력합니다.
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-PORT=5000
-```
 
 ---
 
@@ -124,27 +89,8 @@ PORT=5000
 ## 👤 관리자 기능
 
 - 학교 공식 PDF·문서 업로드 및 벡터 인덱싱
-- 공지사항 수동 등록 및 수정
-- 챗봇 응답 품질 모니터링
+- 유저 및 그룹관리
+- 가입승인
 
 ---
 
-## 🙋 만든 사람
-
-| 이름 | 역할 | GitHub |
-|------|------|--------|
-| 유회한인생 | 풀스택 / AI 개발 | [@yukhoehaninsaeng](https://github.com/yukhoehaninsaeng) |
-
----
-
-## 📄 라이선스
-
-이 프로젝트는 [MIT License](LICENSE) 하에 배포됩니다.
-
----
-
-<div align="center">
-
-Made with ❤️ for 한성대학교
-
-</div>
