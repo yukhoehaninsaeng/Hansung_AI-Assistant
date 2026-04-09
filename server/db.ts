@@ -43,7 +43,14 @@ export async function getDb() {
 }
 
 // Local login functions
-export async function createLocalUser(username: string, password: string, name?: string) {
+export async function createLocalUser(
+  username: string, 
+  password: string, 
+  name?: string,
+  studentId?: string,   // 26.04.09 프로필 학번 및 학과 조회
+  department?: string
+) 
+  {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -57,6 +64,8 @@ export async function createLocalUser(username: string, password: string, name?:
       name: name || username,
       loginMethod: "local",
       lastSignedIn: new Date(),
+      studentId: studentId || null,   // 26.04.09 프로필 학번 및 학과 조회
+      department: department || null,
     })
     .returning({ id: users.id });
 
