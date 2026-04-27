@@ -262,14 +262,11 @@ export const appRouter = router({
         return { success: true, user };
       }),
 
-    // 26.04.09 회원가입 시 학번, 학과 추가
     register: publicProcedure
       .input(z.object({
         username: z.string().min(1).max(64),
         password: z.string().min(6).max(255),
         name: z.string().optional(),
-        studentId: z.string().min(1, "학번을 입력해주세요"),
-        department: z.string().min(1, "학과를 입력해주세요"),
       }))
       .mutation(async ({ ctx, input }) => {
         const existingUser = await getUserByUsername(input.username);
@@ -280,8 +277,6 @@ export const appRouter = router({
           input.username,
           input.password,
           input.name,
-          input.studentId,
-          input.department,
         );
         const user = await getUserById(userId);
         if (!user) {

@@ -87,8 +87,6 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
   const fields = [
     { label: "아이디", value: profile?.username, editable: false },
     { label: "이름", value: profile?.name, editable: false },
-    { label: "학번", value: profile?.studentId, editable: false },
-    { label: "학과", value: profile?.department, editable: false },
     { label: "역할", value: profile?.role === "admin" ? "관리자" : "학생", editable: false },
     { label: "이메일", value: profile?.email, editable: true },
   ];

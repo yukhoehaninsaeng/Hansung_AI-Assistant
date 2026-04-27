@@ -46,9 +46,7 @@ export async function getDb() {
 export async function createLocalUser(
   username: string, 
   password: string, 
-  name?: string,
-  studentId?: string,   // 26.04.09 프로필 학번 및 학과 조회
-  department?: string
+  name?: string
 ) 
   {
   const db = await getDb();
@@ -64,8 +62,6 @@ export async function createLocalUser(
       name: name || username,
       loginMethod: "local",
       lastSignedIn: new Date(),
-      studentId: studentId || null,   // 26.04.09 프로필 학번 및 학과 조회
-      department: department || null,
     })
     .returning({ id: users.id });
 
