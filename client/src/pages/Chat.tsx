@@ -913,9 +913,20 @@ export default function Chat() {
       )
     : conversations;
 
+  const normalizedMessageContents = new Set(
+    (messages as ConvMessage[])
+      .filter((message) => message.role === "user")
+      .map((message) => message.content.trim())
+  );
+
+  const dedupedOptimisticMessages = optimisticMessages.filter(
+    (message) => !normalizedMessageContents.has(message.content.trim())
+  );
+  
   const allMessages: ConvMessage[] = [
     ...(messages as ConvMessage[]),
-    ...optimisticMessages,
+    // ...optimisticMessages,
+    ...dedupedOptimisticMessages,
   ];
 
   const isLoading = createConversation.isPending || sendMessage.isPending;
@@ -1398,3 +1409,10 @@ export default function Chat() {
     </div>
   );
 }
+
+
+
+
+
+
+
