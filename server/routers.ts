@@ -123,8 +123,6 @@ function buildMessagesWithContext(
   }
   const knowledgeBlock = knowledgeSections.join("\n\n");
 
-  const queryLabel = searchQuery ? `"한성대학교 ${searchQuery.slice(0, 40)}"` : "웹검색";
-
   const baseInstruction = [
     "당신은 한성대학교 AI 도우미입니다.",
     "",
@@ -134,11 +132,11 @@ function buildMessagesWithContext(
     "3. 두 곳 모두에 없는 경우 일반 지식으로 답변하되, 공식 홈페이지(www.hansung.ac.kr) 확인을 권장하세요.",
     "4. 항상 친절하고 정확하게, 한국어로 답변하세요.",
     "5. 답변 맨 마지막 줄에 반드시 아래 형식으로 출처를 표기하세요:",
-    "   - 내부 문서를 참고한 경우: `[출처: 내부문서 - \"참고한 문서명1\", \"문서명2\"...]`",
-    `   - 웹 검색을 참고한 경우: \`[출처: DuckDuckGo 검색 - ${queryLabel}]\``,
-    `   - 둘 다 참고한 경우: \`[출처: 내부문서 - \"문서명\" + DuckDuckGo 검색 - ${queryLabel}]\``,
+    "   - 내부 문서만 참고한 경우: `[출처: 내부문서 - \"참고한 문서명1\", \"문서명2\"...]`  ← 실제 참고한 문서명을 모두 나열",
+    "   - 내부 문서 + 웹 검색 둘 다 참고한 경우: `[출처: 내부문서 - \"문서명\" + 한성대학교 웹사이트]`  ← 문서명은 상세히, 웹은 간략히",
+    "   - 웹 검색만 참고한 경우: `[출처: 한성대학교 웹사이트]`",
     "   - 일반 지식으로 답변한 경우: `[출처: 일반지식]`",
-    "   실제로 참고한 문서명과 검색어를 정확히 기재하고, 출처 태그 앞뒤에 다른 텍스트를 붙이지 마세요.",
+    "   출처 태그 앞뒤에 다른 텍스트를 붙이지 마세요.",
   ].join("\n");
 
   const hasSystemMsg = history.some((m) => m.role === "system");
