@@ -107,7 +107,8 @@ async function searchWeb(query: string): Promise<string> {
 function buildMessagesWithContext(
   history: Array<{ role: string; content: string }>,
   fileContext: string,
-  webContext: string
+  webContext: string,
+  searchQuery?: string
 ): Array<{ role: "system" | "user" | "assistant"; content: string }> {
   const knowledgeSections: string[] = [];
   if (fileContext) {
@@ -122,6 +123,8 @@ function buildMessagesWithContext(
   }
   const knowledgeBlock = knowledgeSections.join("\n\n");
 
+  const queryLabel = searchQuery ? `"한성대학교 ${searchQuery.slice(0, 40)}"` : "웹검색";
+
   const baseInstruction = [
     "당신은 한성대학교 AI 도우미입니다.",
     "",
@@ -130,6 +133,12 @@ function buildMessagesWithContext(
     "2. 내부 문서에 없는 내용은 웹 검색 결과를 참고하여 답변하세요.",
     "3. 두 곳 모두에 없는 경우 일반 지식으로 답변하되, 공식 홈페이지(www.hansung.ac.kr) 확인을 권장하세요.",
     "4. 항상 친절하고 정확하게, 한국어로 답변하세요.",
+    "5. 답변 맨 마지막 줄에 반드시 아래 형식으로 출처를 표기하세요:",
+    "   - 내부 문서를 참고한 경우: `[출처: 내부문서 - \"참고한 문서명1\", \"문서명2\"...]`",
+    `   - 웹 검색을 참고한 경우: \`[출처: DuckDuckGo 검색 - ${queryLabel}]\``,
+    `   - 둘 다 참고한 경우: \`[출처: 내부문서 - \"문서명\" + DuckDuckGo 검색 - ${queryLabel}]\``,
+    "   - 일반 지식으로 답변한 경우: `[출처: 일반지식]`",
+    "   실제로 참고한 문서명과 검색어를 정확히 기재하고, 출처 태그 앞뒤에 다른 텍스트를 붙이지 마세요.",
   ].join("\n");
 
   const hasSystemMsg = history.some((m) => m.role === "system");
@@ -313,7 +322,8 @@ export const appRouter = router({
             : Promise.resolve(""),
         ]);
         const fileContext = buildFileContext(files);
-        const llmMessages = buildMessagesWithContext(input.messages, fileContext, webContext);
+        const lastUserMsg = input.messages.length > 0 ? input.messages[input.messages.length - 1].content : undefined;
+        const llmMessages = buildMessagesWithContext(input.messages, fileContext, webContext, lastUserMsg);
         const llmResult = await invokeLLM({ messages: llmMessages });
         const aiContent = llmResult.choices[0]?.message?.content;
         return {
@@ -359,7 +369,7 @@ export const appRouter = router({
           searchWeb(input.content),
         ]);
         const fileContext = buildFileContext(files);
-        const llmMessages = buildMessagesWithContext(history, fileContext, webContext);
+        const llmMessages = buildMessagesWithContext(history, fileContext, webContext, input.content);
         const llmResult = await invokeLLM({ messages: llmMessages });
         const aiContent = llmResult.choices[0]?.message?.content;
         const aiResponse = typeof aiContent === "string" ? aiContent : JSON.stringify(aiContent ?? "");
