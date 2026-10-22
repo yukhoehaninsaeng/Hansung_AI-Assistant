@@ -17,7 +17,6 @@
 ---
 
 ## 📌 프로젝트 소개
-!(https://drive.google.com/file/d/1FHVBIwatVYJD2EkbEi1EXo5J8Ezo_Qdr/view?usp=sharing)
 **Hansung AI Assistant**는 한성대학교 학생들이 학교 생활에 필요한 정보를 빠르고 편리하게 얻을 수 있도록 만든 AI 챗봇 서비스입니다.
 
 공지사항 검색, 수강신청 안내, 학사일정 안내, 입학 정보 등 학교 생활 전반에 걸친 질문에 자연어로 답변하며, 관리자가 업로드한 내부 문서와 실시간 웹 검색을 결합하여 정확한 정보를 제공합니다.
